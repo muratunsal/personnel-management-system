@@ -1,0 +1,10 @@
+:root {
+  --color-bg: #fdfdfd;
+  --color-primary: #2563eb;
+  --color-text: #0f172a;
+  --color-border: #e2e8f0;
+  --color-page-bg: #f1f1f1;
+
+  --sidebar-width: 300px;
+  --topbar-height: 72px;
+}
