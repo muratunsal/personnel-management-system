@@ -81,7 +81,8 @@ body {
 }
 
 .search-input:focus {
-  border: 2px solid var(--color-primary);
+  border: 1px solid var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 0 10px 0 rgba(0, 0, 0, 0.1);
 }
 
 .search-icon {
