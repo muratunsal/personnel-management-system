@@ -1,0 +1,340 @@
+.org-chart-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+
+  background: radial-gradient(
+        circle at 12px 12px,
+        rgba(30, 41, 59, 0.22) 1.5px,
+        rgba(0, 0, 0, 0) 1.5px
+      )
+      0 0/24px 24px,
+    linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid #e5e7eb;
+  border-radius: 24px;
+  cursor: grab;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.org-chart-container:active {
+  cursor: grabbing;
+}
+
+.org-chart-canvas {
+  position: absolute;
+  transition: transform 0.2s ease;
+  transform-origin: 0 0;
+
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.org-chart-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.06));
+}
+
+.org-chart-loading,
+.org-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6b7280;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.org-chart-spinner {
+  width: 52px;
+  height: 52px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #6366f1;
+  border-radius: 50%;
+  animation: org-chart-spin 1.2s linear infinite;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+@keyframes org-chart-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.org-chart-main-line {
+  display: none;
+}
+
+.org-chart-dept-card {
+  position: absolute;
+  background: linear-gradient(
+    135deg,
+    var(--dept-color, #3b82f6) 0%,
+    color-mix(in srgb, var(--dept-color, #3b82f6) 85%, #000) 100%
+  );
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 16px 32px;
+  font-weight: 700;
+  font-size: 16px;
+  text-align: center;
+  color: #ffffff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  min-width: 220px;
+  letter-spacing: 0.4px;
+  z-index: 2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.org-chart-dept-card:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.org-chart-dept-connector {
+  position: absolute;
+  width: 3px;
+  background: #6b7280;
+  z-index: 1;
+}
+
+.org-chart-head-card {
+  position: absolute;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 2px solid #e1e5e9;
+  border-radius: 16px;
+  padding: 18px 20px;
+  width: var(--card-width, 260px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12),
+    0 4px 16px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  z-index: 2;
+  transition: all 0.3s ease;
+
+  will-change: transform, box-shadow;
+  transform: translateZ(0);
+}
+
+.org-chart-head-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.2),
+    0 8px 24px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border-color: #d1d5db;
+}
+
+.org-chart-employee-card {
+  position: absolute;
+  background: linear-gradient(135deg, #ffffff 0%, #fefefe 100%);
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 18px;
+  width: var(--card-width, 260px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  z-index: 2;
+  transition: all 0.3s ease;
+  will-change: transform, box-shadow;
+  transform: translateZ(0);
+}
+
+.org-chart-employee-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15),
+    0 4px 16px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-color: #d1d5db;
+}
+
+.org-chart-head-connector {
+  position: absolute;
+  width: 3px;
+  background: #6b7280;
+  z-index: 1;
+}
+
+.org-chart-employee-vertical-line {
+  position: absolute;
+  width: 3px;
+  background: #9ca3af;
+  z-index: 1;
+}
+
+.org-chart-employee-connector {
+  position: absolute;
+  height: 3px;
+  background: #9ca3af;
+  z-index: 1;
+}
+
+.org-chart-person-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.2), 0 2px 8px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.org-chart-head-card .org-chart-person-avatar,
+.org-chart-employee-card .org-chart-person-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 16px;
+}
+
+.org-chart-head-card:hover .org-chart-person-avatar,
+.org-chart-employee-card:hover .org-chart-person-avatar {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25),
+    0 4px 12px rgba(15, 23, 42, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.org-chart-person-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.org-chart-person-name {
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 2px;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.org-chart-head-card .org-chart-person-name {
+  font-size: 16px;
+}
+
+.org-chart-employee-card .org-chart-person-name {
+  font-size: 14px;
+}
+
+.org-chart-person-title {
+  color: #6b7280;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.org-chart-head-card .org-chart-person-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.org-chart-employee-card .org-chart-person-title {
+  font-size: 12px;
+}
+
+.org-chart-head-badge {
+  display: none;
+}
+
+.org-chart-controls {
+  position: absolute;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+
+.org-chart-zoom-btn {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 20px;
+  color: #f8fafc;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.4), 0 4px 12px rgba(2, 6, 23, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  backdrop-filter: saturate(140%) blur(8px);
+}
+
+.org-chart-zoom-btn:hover {
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.5), 0 6px 16px rgba(2, 6, 23, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.org-chart-zoom-btn:active {
+  transform: translateY(0) scale(0.95);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.org-chart-reset-btn {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 11px;
+  color: #f8fafc;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.4), 0 4px 12px rgba(2, 6, 23, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  backdrop-filter: saturate(140%) blur(8px);
+  letter-spacing: 0.3px;
+}
+
+.org-chart-reset-btn:hover {
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.5), 0 6px 16px rgba(2, 6, 23, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.org-chart-reset-btn:active {
+  transform: translateY(0) scale(0.95);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
