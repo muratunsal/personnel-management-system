@@ -64,7 +64,9 @@ public class AuthController {
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.ok(new ProvisionResponse(request.getEmail(), null, false));
         }
-        String rawPassword = java.util.UUID.randomUUID().toString().substring(0, 10);
+        String rawPassword = (request.getPassword() != null && !request.getPassword().isBlank())
+                ? request.getPassword()
+                : java.util.UUID.randomUUID().toString().substring(0, 10);
         User u = new User();
         u.setEmail(request.getEmail());
         u.setPassword(passwordEncoder.encode(rawPassword));
