@@ -11,9 +11,12 @@ import java.time.LocalTime;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/meetings")
+@Tag(name = "Meetings", description = "Manage meetings")
 public class MeetingController {
 
     private final MeetingService meetingService;
@@ -24,6 +27,7 @@ public class MeetingController {
     }
 
     @GetMapping
+    @Operation(summary = "List all meetings")
     public ResponseEntity<List<Meeting>> list() {
         log.info("List meetings");
         meetingService.finalizePastMeetings();
@@ -31,6 +35,7 @@ public class MeetingController {
     }
 
     @GetMapping("/me")
+    @Operation(summary = "List my meetings")
     public ResponseEntity<List<Meeting>> myMeetings(Authentication auth) {
         log.info("List my meetings for {}", auth != null ? auth.getPrincipal() : "unknown");
         meetingService.finalizePastMeetings();
@@ -38,6 +43,7 @@ public class MeetingController {
     }
 
     @GetMapping("/user")
+    @Operation(summary = "List meetings for current user")
     public ResponseEntity<List<Meeting>> userMeetings(Authentication auth) {
         log.info("List user meetings for {}", auth != null ? auth.getPrincipal() : "unknown");
         meetingService.finalizePastMeetings();
@@ -45,6 +51,7 @@ public class MeetingController {
     }
 
     @GetMapping("/department/{departmentId}")
+    @Operation(summary = "List meetings by department")
     public ResponseEntity<List<Meeting>> byDepartment(@PathVariable Long departmentId) {
         log.info("List department meetings {}", departmentId);
         meetingService.finalizePastMeetings();
@@ -52,6 +59,7 @@ public class MeetingController {
     }
 
     @PostMapping("/create")
+    @Operation(summary = "Create a meeting")
     public ResponseEntity<Meeting> create(@RequestBody CreateMeetingRequest req, Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();
         try {

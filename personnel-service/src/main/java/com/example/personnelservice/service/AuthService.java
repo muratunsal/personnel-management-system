@@ -116,6 +116,26 @@ public class AuthService {
         }
     }
 
+    public String provisionWithPasswordNoEmail(String email, java.util.List<String> roles, String password) {
+        try {
+            java.util.Map<String, Object> req = new java.util.HashMap<>();
+            req.put("email", email);
+            req.put("roles", roles);
+            if (password != null && !password.isBlank()) req.put("password", password);
+            req.put("suppressEmail", true);
+            java.util.Map resp = webClient.post()
+                    .uri(authServiceUrl + "/auth/provision")
+                    .bodyValue(req)
+                    .retrieve()
+                    .bodyToMono(java.util.Map.class)
+                    .block();
+            Object pw = resp != null ? resp.get("password") : null;
+            return pw != null ? pw.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public boolean updateUser(String email, String newEmail, java.util.List<String> roles) {
         try {
             java.util.Map<String, Object> req = new java.util.HashMap<>();

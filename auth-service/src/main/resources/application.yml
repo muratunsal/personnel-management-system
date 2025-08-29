@@ -20,7 +20,7 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
-    show-sql: true
+    show-sql: false
 
 jwt:
   expiration: 86400000
@@ -34,4 +34,9 @@ eureka:
 
 logging:
   level:
-    com.example.authservice: DEBUG
+    root: INFO
+    com.example.authservice: INFO
+    org.springframework.amqp: WARN
+    org.springdoc: WARN
+    org.springframework.cloud.netflix.eureka: WARN
+    com.netflix.discovery: WARN

@@ -16,6 +16,8 @@ public class ProvisionRequest {
 
     private String password;
 
+    private Boolean suppressEmail;
+
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
@@ -24,6 +26,9 @@ public class ProvisionRequest {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+    public Boolean getSuppressEmail() { return suppressEmail; }
+    public void setSuppressEmail(Boolean suppressEmail) { this.suppressEmail = suppressEmail; }
 }
 
 

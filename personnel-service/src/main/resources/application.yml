@@ -14,7 +14,7 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         jdbc:
           time_zone: UTC
     open-in-view: false
@@ -40,4 +40,11 @@ eureka:
 
 logging:
   level:
-    org.hibernate.SQL: debug
+    root: INFO
+    com.example.personnelservice: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.springframework.amqp: WARN
+    org.springdoc: WARN
+    org.springframework.cloud.netflix.eureka: WARN
+    com.netflix.discovery: WARN

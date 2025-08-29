@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/titles")
 @CrossOrigin(origins = "http://localhost:3000")
+@Tag(name = "Titles", description = "Manage titles")
 public class TitleController {
     private final TitleRepository titleRepository;
     private final DepartmentRepository departmentRepository;
@@ -29,16 +32,19 @@ public class TitleController {
     }
 
     @GetMapping
+    @Operation(summary = "List all titles")
     public List<Title> all() {
         return titleRepository.findAll();
     }
 
     @GetMapping("/department/{departmentId}")
+    @Operation(summary = "List titles by department")
     public List<Title> getTitlesByDepartment(@PathVariable Long departmentId) {
         return titleRepository.findByDepartmentId(departmentId);
     }
 
     @PostMapping
+    @Operation(summary = "Create a title")
     public ResponseEntity<Title> createTitle(@Valid @RequestBody CreateTitleRequest request) {
         if (titleRepository.existsByNameIgnoreCase(request.getName())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
@@ -54,6 +60,7 @@ public class TitleController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a title")
     public ResponseEntity<Title> updateTitle(@PathVariable Long id, @Valid @RequestBody UpdateTitleRequest request) {
         Title title = titleRepository.findById(id).orElse(null);
         if (title == null) {
@@ -75,6 +82,7 @@ public class TitleController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a title and cleanup relations")
     public ResponseEntity<?> deleteTitle(@PathVariable Long id) {
         try {
             Title title = titleRepository.findById(id)

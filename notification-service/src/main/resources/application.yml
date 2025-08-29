@@ -60,5 +60,11 @@ auth-service:
 
 logging:
   level:
-    com.example.notificationservice: DEBUG
-    org.springframework.amqp: DEBUG
+    root: INFO
+    com.example.notificationservice: INFO
+    org.springframework.amqp: WARN
+    org.springframework.amqp.rabbit: WARN
+    org.springframework.amqp.rabbit.listener: WARN
+    org.springdoc: WARN
+    org.springframework.cloud.netflix.eureka: WARN
+    com.netflix.discovery: WARN

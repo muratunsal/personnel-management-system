@@ -16,10 +16,13 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/people")
 @CrossOrigin(origins = "http://localhost:3000")
+@Tag(name = "People", description = "Manage people")
 public class PersonController {
 
     private final PersonService personService;
@@ -30,6 +33,7 @@ public class PersonController {
     }
 
     @PostMapping
+    @Operation(summary = "Create a person")
     public ResponseEntity<Person> createPerson(@Valid @RequestBody CreatePersonRequest request) {
         try {
             log.info("Create person request for {}", request.getEmail());
@@ -43,6 +47,7 @@ public class PersonController {
     }
 
     @GetMapping
+    @Operation(summary = "List people with filters and pagination")
     public ResponseEntity<?> getPeople(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -86,6 +91,7 @@ public class PersonController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get person by id")
     public ResponseEntity<Person> getPersonById(@PathVariable Long id) {
         log.info("Get person by id {}", id);
         return personService.findById(id)
@@ -94,18 +100,21 @@ public class PersonController {
     }
 
     @GetMapping("/test")
+    @Operation(summary = "Health check for personnel service")
     public ResponseEntity<String> test() {
         log.info("Test endpoint called");
         return ResponseEntity.ok("Personnel service is working!");
     }
 
     @GetMapping("/test-auth")
+    @Operation(summary = "Health check for auth integration")
     public ResponseEntity<String> testAuth() {
         log.info("Test-auth endpoint called");
         return ResponseEntity.ok("Authentication is working!");
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a person")
     public ResponseEntity<?> updatePerson(@PathVariable Long id, @Valid @RequestBody UpdatePersonRequest request) {
         try {
             log.info("Update person {}", id);
@@ -121,6 +130,7 @@ public class PersonController {
 
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a person and cleanup relations")
     public ResponseEntity<?> deletePerson(@PathVariable Long id) {
         try {
             log.info("Delete person {}", id);

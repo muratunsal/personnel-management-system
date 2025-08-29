@@ -156,7 +156,7 @@ public class DataInitializer {
                 if (isHr) roles.add("HR");
                 if (isHead) roles.add("HEAD");
                 if (roles.isEmpty()) roles.add("EMPLOYEE");
-                authService.provisionWithPassword(p.getEmail(), roles, "123456");
+                authService.provisionWithPasswordNoEmail(p.getEmail(), roles, "123456");
             }
             
             List<Person> savedPeople = personRepository.saveAll(people);

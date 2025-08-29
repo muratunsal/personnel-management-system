@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/departments")
 @CrossOrigin(origins = "http://localhost:3000")
+@Tag(name = "Departments", description = "Manage departments")
 public class DepartmentController {
     private final DepartmentRepository departmentRepository;
     private final PersonRepository personRepository;
@@ -39,12 +42,14 @@ public class DepartmentController {
     }
 
     @GetMapping
+    @Operation(summary = "List departments")
     public List<Department> all() {
         log.info("List departments");
         return departmentRepository.findAll();
     }
 
     @GetMapping("/organization-structure")
+    @Operation(summary = "Get organization structure")
     public Map<String, Object> getOrganizationStructure() {
         log.info("Get organization structure");
         List<Department> departments = departmentRepository.findAll();
@@ -96,6 +101,7 @@ public class DepartmentController {
     }
 
     @PostMapping
+    @Operation(summary = "Create a department")
     public ResponseEntity<Department> createDepartment(@Valid @RequestBody CreateDepartmentRequest request) {
         log.info("Create department {}", request.getName());
         if (departmentRepository.existsByNameIgnoreCase(request.getName())) {
@@ -125,6 +131,7 @@ public class DepartmentController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update a department")
     public ResponseEntity<Department> updateDepartment(@PathVariable Long id, @Valid @RequestBody UpdateDepartmentRequest request) {
         log.info("Update department {}", id);
         Department department = departmentRepository.findById(id).orElse(null);
@@ -144,6 +151,7 @@ public class DepartmentController {
     }
 
     @PostMapping("/{departmentId}/assign-head")
+    @Operation(summary = "Assign a head to department")
     public ResponseEntity<Department> assignHead(@PathVariable Long departmentId,
                                                  @Valid @RequestBody AssignHeadRequest request) {
         log.info("Assign head {} -> {}", departmentId, request.getPersonId());
@@ -175,6 +183,7 @@ public class DepartmentController {
     }
 
     @PostMapping("/{departmentId}/clear-head")
+    @Operation(summary = "Clear head of department")
     public ResponseEntity<Department> clearHead(@PathVariable Long departmentId) {
         log.info("Clear head for department {}", departmentId);
         Department department = departmentRepository.findById(departmentId)
@@ -185,6 +194,7 @@ public class DepartmentController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete department and cleanup relations")
     public ResponseEntity<?> deleteDepartment(@PathVariable Long id) {
         try {
             log.info("Delete department {}", id);

@@ -21,10 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/auth")
 @CrossOrigin(origins = "http://localhost:3000")
+@Tag(name = "Auth", description = "Authentication endpoints")
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
@@ -42,6 +45,7 @@ public class AuthController {
     private RabbitTemplate rabbitTemplate;
 
     @PostMapping("/login")
+    @Operation(summary = "Login with email and password")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
         log.info("Login request received for email {}", loginRequest.getEmail());
         Optional<String> token = authService.login(loginRequest.getEmail(), loginRequest.getPassword());
@@ -59,6 +63,7 @@ public class AuthController {
     }
 
     @PostMapping("/validate")
+    @Operation(summary = "Validate JWT token and return claims")
     public ResponseEntity<?> validateToken(@RequestParam String token) {
         log.info("Token validation requested");
         if (authService.validateToken(token)) {
@@ -74,6 +79,7 @@ public class AuthController {
     }
 
     @PostMapping("/provision")
+    @Operation(summary = "Provision a user and emit event")
     public ResponseEntity<?> provision(@Valid @RequestBody ProvisionRequest request) {
         log.info("Provision request for {}", request.getEmail());
         if ("admin".equalsIgnoreCase(request.getEmail())) {
@@ -100,13 +106,19 @@ public class AuthController {
         event.setEmail(request.getEmail());
         event.setFullName(null);
         event.setPassword(rawPassword);
-        rabbitTemplate.convertAndSend(USER_PROVISIONED_EXCHANGE, USER_PROVISIONED_ROUTING_KEY, event,
-                m -> { m.getMessageProperties().setHeader("__TypeId__", "com.example.authservice.event.UserProvisionedEvent"); return m; });
-        log.info("User provisioned and event sent for {}", request.getEmail());
+        boolean suppress = request.getSuppressEmail() != null && request.getSuppressEmail();
+        if (!suppress) {
+            rabbitTemplate.convertAndSend(USER_PROVISIONED_EXCHANGE, USER_PROVISIONED_ROUTING_KEY, event,
+                    m -> { m.getMessageProperties().setHeader("__TypeId__", "com.example.authservice.event.UserProvisionedEvent"); return m; });
+            log.info("User provisioned and event sent for {}", request.getEmail());
+        } else {
+            log.info("User provisioned without sending event for {}", request.getEmail());
+        }
         return ResponseEntity.ok(new ProvisionResponse(request.getEmail(), rawPassword, true));
     }
 
     @PostMapping("/update-user")
+    @Operation(summary = "Update user email or roles in auth store")
     public ResponseEntity<?> updateUser(@Valid @RequestBody UpdateUserRequest request) {
         log.info("Update user request for {}", request.getEmail());
         if ("admin".equalsIgnoreCase(request.getEmail())) {

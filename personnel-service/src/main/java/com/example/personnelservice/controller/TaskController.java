@@ -8,9 +8,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/tasks")
+@Tag(name = "Tasks", description = "Manage tasks")
 public class TaskController {
 
     private final TaskService taskService;
@@ -21,12 +24,14 @@ public class TaskController {
     }
 
     @GetMapping
+    @Operation(summary = "List all tasks")
     public ResponseEntity<java.util.List<Task>> list() {
         log.info("List tasks");
         return ResponseEntity.ok(taskService.listAll());
     }
 
     @PostMapping("/create")
+    @Operation(summary = "Create and assign a task")
     public ResponseEntity<Task> createAndAssign(@RequestBody CreateAndAssignRequest req, Authentication auth) {
         if (!hasAnyRole(auth, "ROLE_ADMIN", "ROLE_HEAD", "ROLE_HR")) return ResponseEntity.status(403).build();
         log.info("Create task {} by {} for assignee {}", req.title, auth != null ? auth.getPrincipal() : "unknown", req.assigneeId);
@@ -35,12 +40,14 @@ public class TaskController {
     }
 
     @GetMapping("/me")
+    @Operation(summary = "List tasks assigned to me")
     public ResponseEntity<List<Task>> myTasks(Authentication auth) {
         log.info("List my tasks for {}", auth != null ? auth.getPrincipal() : "unknown");
         return ResponseEntity.ok(taskService.getTasksForAssignee((String) auth.getPrincipal()));
     }
 
     @GetMapping("/user")
+    @Operation(summary = "List tasks created by me")
     public ResponseEntity<List<Task>> userTasks(Authentication auth) {
         log.info("List user tasks for {}", auth != null ? auth.getPrincipal() : "unknown");
         return ResponseEntity.ok(taskService.getTasksForUser((String) auth.getPrincipal()));
@@ -48,6 +55,7 @@ public class TaskController {
 
 
     @PutMapping("/{taskId}/status")
+    @Operation(summary = "Update task status")
     public ResponseEntity<Task> updateStatus(@PathVariable Long taskId, @RequestBody UpdateTaskStatusRequest req, Authentication auth) {
         if (!hasAnyRole(auth, "ROLE_ADMIN", "ROLE_HEAD", "ROLE_EMPLOYEE")) return ResponseEntity.status(403).build();
         log.info("Update task status {} -> {} by {}", taskId, req.status, auth != null ? auth.getPrincipal() : "unknown");
@@ -56,6 +64,7 @@ public class TaskController {
     }
 
     @PutMapping("/{taskId}/close")
+    @Operation(summary = "Close a task")
     public ResponseEntity<Task> close(@PathVariable Long taskId, Authentication auth) {
         if (!hasAnyRole(auth, "ROLE_ADMIN", "ROLE_HEAD")) return ResponseEntity.status(403).build();
         log.info("Close task {} by {}", taskId, auth != null ? auth.getPrincipal() : "unknown");
