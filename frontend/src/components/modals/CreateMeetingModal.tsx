@@ -209,7 +209,7 @@ export default function CreateMeetingModal({
               />
             </div>
             <div className="form-field">
-              <label className="form-label">Department*</label>
+              <label className="form-label">Department</label>
               {isHeadUser ? (
                 <div className="form-input form-input--locked" title="Department is locked for Head users">
                   {userDepartment?.name || 'Your Department'}
@@ -219,7 +219,6 @@ export default function CreateMeetingModal({
                   className="form-select" 
                   value={formData.departmentId} 
                   onChange={(e) => handleDepartmentChange(e.target.value)} 
-                  required
                 >
                   <option value="">All Departments</option>
                   {departments.map(d => (<option key={d.id} value={d.id}>{d.name}</option>))}

@@ -31,6 +31,7 @@ export default function AdminDashboard({
   onViewAllMeetings
 }: AdminDashboardProps) {
   const { token } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalEmployees: 0,
     activeDepartments: 0,
@@ -51,6 +52,7 @@ export default function AdminDashboard({
     if (!token) return;
     
     const loadDashboardData = async () => {
+      setLoading(true);
       try {
         const [peopleRes, deptRes, tasksRes, meetingsRes] = await Promise.all([
           fetch('http://localhost:8081/api/people', {
@@ -116,6 +118,8 @@ export default function AdminDashboard({
         }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -169,6 +173,15 @@ export default function AdminDashboard({
       console.error('Error closing task:', error);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="org-chart-loading">
+        <div className="org-chart-spinner"></div>
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-container">

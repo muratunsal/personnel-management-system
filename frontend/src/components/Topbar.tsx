@@ -1,4 +1,3 @@
-import { ReactComponent as BellIcon } from '../icons/bell.svg';
 import { ReactComponent as UserAvatarIcon } from '../icons/user-avatar.svg';
 import { useTabs } from '../context/TabsContext';
 import { useAuth } from '../context/AuthContext';
@@ -36,7 +35,6 @@ export function Topbar() {
         <div className="topbar-title">{activeTab}</div>
       </div>
       <div className="topbar-section right">
-        <button className="icon-button" aria-label="Notifications"><BellIcon width={20} height={20} /></button>
         <div className="profile-button">
           <div className="avatar">
             {!isAdmin && me?.profilePictureUrl ? (

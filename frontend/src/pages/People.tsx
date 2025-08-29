@@ -8,6 +8,7 @@ import { ReactComponent as UserAvatarIcon } from "../icons/user-avatar.svg";
 import { ReactComponent as EyeIcon } from "../icons/eye.svg";
 import PersonProfileView from "../components/PersonProfileView";
 import { useAuth } from "../context/AuthContext";
+import { useData } from "../context/DataContext";
 import type { Department, Title, Person } from "../types/models";
 
 type SortState = { sortBy: keyof Person | "id" | "person" | "department.name" | "title.name"; direction: "asc" | "desc" };
@@ -28,6 +29,7 @@ const defaultFilters: Filters = {
 
 export default function People() {
   const { isAuthenticated, token } = useAuth();
+  const { departments: depState, titles: titleState, refreshDepartments, refreshTitles } = useData();
   const [rows, setRows] = useState<Person[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -42,6 +44,7 @@ export default function People() {
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [titles, setTitles] = useState<Title[]>([]);
+  const [bootLoading, setBootLoading] = useState(true);
 
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
 
@@ -61,28 +64,18 @@ export default function People() {
   const visibleColumns = columns.filter(col => col.visible);
 
   useEffect(() => {
+    setDepartments(depState.data);
+    setTitles(titleState.data);
+  }, [depState.data, titleState.data]);
+
+  useEffect(() => {
     if (!isAuthenticated || !token) return;
-    
-    const loadMeta = async () => {
-      try {
-        const [depRes, titleRes] = await Promise.all([
-          axios.get<Department[]>("http://localhost:8081/api/departments", {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axios.get<Title[]>("http://localhost:8081/api/titles", {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-        ]);
-        const orderedDepartments = [...depRes.data].sort((a, b) => a.name.localeCompare(b.name));
-        const orderedTitles = [...titleRes.data].sort((a, b) => a.name.localeCompare(b.name));
-        setDepartments(orderedDepartments);
-        setTitles(orderedTitles);
-      } catch (error) {
-        console.error("Error loading metadata:", error);
-      }
+    const init = async () => {
+      await Promise.all([refreshDepartments(), refreshTitles()]);
+      setBootLoading(false);
     };
-    loadMeta();
-  }, [isAuthenticated, token]);
+    init();
+  }, [isAuthenticated, token, refreshDepartments, refreshTitles]);
 
   const getOrderedTitlesForDepartment = (departmentId: number) => {
     const dep = departments.find(d => d.id === departmentId);
@@ -196,7 +189,14 @@ export default function People() {
     );
   }
 
-  if (loading) return <div className="people-container">Loading...</div>;
+  if (bootLoading || loading) {
+    return (
+      <div className="org-chart-loading">
+        <div className="org-chart-spinner"></div>
+        <p>Loading people...</p>
+      </div>
+    );
+  }
   if (error) return <div className="people-container">Error: {error}</div>;
 
   const totalPages = Math.max(1, Math.ceil(total / size));

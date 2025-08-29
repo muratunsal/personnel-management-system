@@ -23,6 +23,14 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [titles, setTitles] = useState<Title[]>([]);
   const [userDepartment, setUserDepartment] = useState<number | null>(null);
+  const [initialPerson, setInitialPerson] = useState<Person | null>(null);
+  const [draftPerson, setDraftPerson] = useState<Person>(person);
+
+  useEffect(() => {
+    if (!isEdit) {
+      setDraftPerson(person);
+    }
+  }, [person, isEdit]);
 
   const userPermissions = {
     canViewSensitive: permissions.canViewSensitiveInfo(user?.role || '', user?.email || '', person.email, userDepartment, person.department?.id || null),
@@ -63,7 +71,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
       }
     };
     fetchData();
-  }, [token]);
+  }, [token, person?.id]);
 
   useEffect(() => {
     if (user?.role === 'HEAD' && user?.email && token) {
@@ -87,30 +95,38 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
 
   const handleSave = async () => {
     try {
-      let updatedImageUrl = person.profilePictureUrl;
+      if (!draftPerson.department?.id) {
+        alert('Please select a department');
+        return;
+      }
+      if (!draftPerson.title?.id) {
+        alert('Please select a title');
+        return;
+      }
+      let updatedImageUrl = draftPerson.profilePictureUrl;
       
       if (previewUrl) {
         updatedImageUrl = previewUrl;
       }
 
       const payload = {
-        firstName: person.firstName,
-        lastName: person.lastName,
-        email: person.email,
-        phoneNumber: person.phoneNumber || null,
-        departmentId: person.department?.id || null,
-        titleId: person.title?.id || null,
-        contractStartDate: person.contractStartDate || null,
-        birthDate: person.birthDate || null,
-        gender: person.gender || null,
-        address: person.address || null,
+        firstName: draftPerson.firstName,
+        lastName: draftPerson.lastName,
+        email: draftPerson.email,
+        phoneNumber: draftPerson.phoneNumber || null,
+        departmentId: draftPerson.department?.id || null,
+        titleId: draftPerson.title?.id || null,
+        contractStartDate: draftPerson.contractStartDate || null,
+        birthDate: draftPerson.birthDate || null,
+        gender: draftPerson.gender || null,
+        address: draftPerson.address || null,
         profilePictureUrl: updatedImageUrl,
-        salary: person.salary || null,
-        nationalId: person.nationalId || null,
-        bankAccount: person.bankAccount || null,
-        insuranceNumber: person.insuranceNumber || null,
-        contractType: person.contractType || null,
-        contractEndDate: person.contractEndDate || null,
+        salary: draftPerson.salary || null,
+        nationalId: draftPerson.nationalId || null,
+        bankAccount: draftPerson.bankAccount || null,
+        insuranceNumber: draftPerson.insuranceNumber || null,
+        contractType: draftPerson.contractType || null,
+        contractEndDate: draftPerson.contractEndDate || null,
         
       };
 
@@ -130,6 +146,39 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
         setUrlInput('');
         setShowUrlInput(false);
         setIsEdit(false);
+        try {
+          const wasHeadDeptId = initialPerson?.department?.id || null;
+          const wasHeadDeptName = initialPerson?.department?.name || '';
+          const wasHeadTitleName = wasHeadDeptName ? `Head of ${wasHeadDeptName}` : '';
+          const wasHead = initialPerson?.title?.name === wasHeadTitleName;
+          const stillSameDept = savedPerson.department?.id && wasHeadDeptId && savedPerson.department.id === wasHeadDeptId;
+          const stillHeadSameDept = stillSameDept && savedPerson.title?.name === wasHeadTitleName;
+          if (wasHead && !stillHeadSameDept && wasHeadDeptId && token) {
+            await fetch(`http://localhost:8081/api/departments/${wasHeadDeptId}/clear-head`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` }
+            });
+          }
+        } catch (e) {
+          console.error('Failed to clear previous head assignment:', e);
+        }
+        setInitialPerson(null);
+        try {
+          const [deptRes, titleRes] = await Promise.all([
+            fetch('http://localhost:8081/api/departments', {
+              headers: { Authorization: `Bearer ${token}` }
+            }),
+            fetch('http://localhost:8081/api/titles', {
+              headers: { Authorization: `Bearer ${token}` }
+            })
+          ]);
+          const deptData = await deptRes.json();
+          const titleData = await titleRes.json();
+          setDepartments(deptData);
+          setTitles(titleData);
+        } catch (e) {
+          console.error('Failed to refresh metadata:', e);
+        }
       } else {
         const errorText = await response.text();
         alert(`Save failed: ${response.status} - ${errorText}`);
@@ -163,7 +212,9 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
   };
 
   const updatePerson = (field: keyof Person, value: any) => {
-    if (onPersonUpdate) {
+    if (isEdit) {
+      setDraftPerson(prev => ({ ...prev, [field]: value } as Person));
+    } else if (onPersonUpdate) {
       onPersonUpdate({ ...person, [field]: value });
     }
   };
@@ -194,6 +245,8 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
 
   const onEditToggle = () => {
     if (!isEdit) {
+      setInitialPerson(person ? { ...person } : null);
+      setDraftPerson(person);
       setPreviewUrl(null);
       setUrlInput('');
       setShowUrlInput(false);
@@ -312,7 +365,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
             <input 
               type="text" 
               className="field-input base-input" 
-              value={person.firstName || ''} 
+              value={(isEdit ? draftPerson.firstName : person.firstName) || ''} 
               onChange={(e) => updatePerson('firstName', e.target.value)} 
               readOnly={!isEdit} 
             />
@@ -323,7 +376,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
             <input 
               type="text" 
               className="field-input base-input" 
-              value={person.lastName || ''} 
+              value={(isEdit ? draftPerson.lastName : person.lastName) || ''} 
               onChange={(e) => updatePerson('lastName', e.target.value)} 
               readOnly={!isEdit} 
             />
@@ -334,7 +387,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
             <input 
               type="email" 
               className="field-input base-input" 
-              value={person.email || ''} 
+              value={(isEdit ? draftPerson.email : person.email) || ''} 
               onChange={(e) => updatePerson('email', e.target.value)} 
               readOnly={!isEdit} 
             />
@@ -347,7 +400,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
             <input 
               type="tel" 
               className="field-input base-input" 
-              value={person.phoneNumber || ''} 
+              value={(isEdit ? draftPerson.phoneNumber : person.phoneNumber) || ''} 
               onChange={(e) => updatePerson('phoneNumber', e.target.value)} 
               placeholder="Not provided" 
               readOnly={!isEdit} 
@@ -360,8 +413,11 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
               <div className="custom-dropdown-wrapper">
                 <select 
                   className="field-input base-input custom-dropdown" 
-                  value={person.department?.id?.toString() || ''} 
-                  onChange={(e) => updatePerson('department', departments.find(d => d.id === Number(e.target.value)) || null)}
+                  value={draftPerson.department?.id?.toString() || ''} 
+                  onChange={(e) => {
+                    const selected = departments.find(d => d.id === Number(e.target.value)) || null;
+                    setDraftPerson(prev => ({ ...prev, department: selected, title: null } as Person));
+                  }}
                 >
                   <option value="">Select Department</option>
                   {departments.map(dept => (
@@ -381,13 +437,23 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
               <div className="custom-dropdown-wrapper">
                 <select 
                   className="field-input base-input custom-dropdown" 
-                  value={person.title?.id?.toString() || ''} 
-                  onChange={(e) => updatePerson('title', getOrderedTitlesForDepartment(person.department?.id || null).find(t => t.id === Number(e.target.value)) || null)}
+                  value={draftPerson.title?.id?.toString() || ''} 
+                  onChange={(e) => {
+                    const list = getOrderedTitlesForDepartment(draftPerson.department?.id || null);
+                    const found = list.find(t => t.id === Number(e.target.value)) || null;
+                    setDraftPerson(prev => ({ ...prev, title: found } as Person));
+                  }}
                 >
                   <option value="">Select Title</option>
-                  {getOrderedTitlesForDepartment(person.department?.id || null).map(title => (
-                    <option key={title.id} value={title.id}>{title.name}</option>
-                  ))}
+                  {(() => {
+                    const base = getOrderedTitlesForDepartment(draftPerson.department?.id || null);
+                    const current = draftPerson.title;
+                    const hasCurrent = current ? base.some(t => t.id === current.id) : true;
+                    const finalList = !hasCurrent && current ? [current, ...base] : base;
+                    return finalList.map(title => (
+                      <option key={title.id} value={title.id}>{title.name}</option>
+                    ));
+                  })()}
                 </select>
                 <ChevronDownIcon className="dropdown-icon" width={16} height={16} />
               </div>
@@ -398,14 +464,28 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
 
           <div className="form-field">
             <label className="field-label">Gender</label>
-            <input 
-              type="text" 
-              className="field-input base-input" 
-              value={person.gender || ''} 
-              onChange={(e) => updatePerson('gender', e.target.value)} 
-              placeholder="Not specified" 
-              readOnly={!isEdit} 
-            />
+            {isEdit ? (
+              <div className="custom-dropdown-wrapper">
+                <select 
+                  className="field-input base-input custom-dropdown" 
+                  value={draftPerson.gender || ''} 
+                  onChange={(e) => updatePerson('gender', e.target.value)}
+                >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                <ChevronDownIcon className="dropdown-icon" width={16} height={16} />
+              </div>
+            ) : (
+              <input 
+                type="text" 
+                className="field-input base-input" 
+                value={person.gender || 'Not specified'} 
+                readOnly 
+              />
+            )}
           </div>
 
           {userPermissions.canViewSensitive && (
@@ -417,7 +497,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="date" 
                   className="field-input base-input" 
-                  value={person.birthDate || ''} 
+                  value={(isEdit ? draftPerson.birthDate : person.birthDate) || ''} 
                   onChange={(e) => updatePerson('birthDate', e.target.value)} 
                   readOnly={!isEdit} 
                 />
@@ -428,7 +508,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="text" 
                   className="field-input base-input" 
-                  value={person.address || ''} 
+                  value={(isEdit ? draftPerson.address : person.address) || ''} 
                   onChange={(e) => updatePerson('address', e.target.value)} 
                   placeholder="Not provided" 
                   readOnly={!isEdit} 
@@ -441,7 +521,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                   <input 
                     type="number" 
                     className="field-input base-input" 
-                    value={person.salary || ''} 
+                    value={draftPerson.salary || ''} 
                     onChange={(e) => updatePerson('salary', Number(e.target.value))} 
                     placeholder="Enter salary amount"
                     step="1"
@@ -463,7 +543,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                   <div className="custom-dropdown-wrapper">
                     <select 
                       className="field-input base-input custom-dropdown" 
-                      value={person.contractType || ''} 
+                      value={draftPerson.contractType || ''} 
                       onChange={(e) => updatePerson('contractType', e.target.value)}
                     >
                       <option value="">Select Contract Type</option>
@@ -483,7 +563,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="date" 
                   className="field-input base-input" 
-                  value={person.contractStartDate || ''} 
+                  value={(isEdit ? draftPerson.contractStartDate : person.contractStartDate) || ''} 
                   onChange={(e) => updatePerson('contractStartDate', e.target.value)} 
                   readOnly={!isEdit} 
                 />
@@ -494,7 +574,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="date" 
                   className="field-input base-input" 
-                  value={person.contractEndDate || ''} 
+                  value={(isEdit ? draftPerson.contractEndDate : person.contractEndDate) || ''} 
                   onChange={(e) => updatePerson('contractEndDate', e.target.value)} 
                   readOnly={!isEdit} 
                 />
@@ -505,7 +585,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="text" 
                   className="field-input base-input" 
-                  value={person.bankAccount || ''} 
+                  value={(isEdit ? draftPerson.bankAccount : person.bankAccount) || ''} 
                   onChange={(e) => updatePerson('bankAccount', e.target.value)} 
                   readOnly={!isEdit} 
                 />
@@ -516,7 +596,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="text" 
                   className="field-input base-input" 
-                  value={person.nationalId || ''} 
+                  value={(isEdit ? draftPerson.nationalId : person.nationalId) || ''} 
                   onChange={(e) => updatePerson('nationalId', e.target.value)} 
                   readOnly={!isEdit} 
                 />
@@ -527,7 +607,7 @@ export default function PersonProfileView({ person, onBack, onPersonUpdate }: {
                 <input 
                   type="text" 
                   className="field-input base-input" 
-                  value={person.insuranceNumber || ''} 
+                  value={(isEdit ? draftPerson.insuranceNumber : person.insuranceNumber) || ''} 
                   onChange={(e) => updatePerson('insuranceNumber', e.target.value)} 
                   readOnly={!isEdit} 
                 />

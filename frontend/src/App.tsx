@@ -6,6 +6,7 @@ import { Topbar } from './components/Topbar';
 import Dashboard from './pages/Dashboard';
 import People from './pages/People';
 import Organization from './pages/Organization';
+import { DataProvider } from './context/DataContext';
 import Login from './pages/Login';
 
 function Content() {
@@ -25,15 +26,17 @@ function AppContent() {
 
   return (
     <TabsProvider>
-      <div className="app-shell">
-        <Sidebar />
-        <Topbar />
-        <main className="content">
-          <div className="content-card">
-            <Content />
-          </div>
-        </main>
-      </div>
+      <DataProvider>
+        <div className="app-shell">
+          <Sidebar />
+          <Topbar />
+          <main className="content">
+            <div className="content-card">
+              <Content />
+            </div>
+          </main>
+        </div>
+      </DataProvider>
     </TabsProvider>
   );
 }

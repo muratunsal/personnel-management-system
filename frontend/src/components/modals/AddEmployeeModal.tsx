@@ -8,7 +8,7 @@ interface AddEmployeeFormData {
   phoneNumber: string;
   departmentId: string;
   titleId: string;
-  startDate: string;
+  contractStartDate: string;
   birthDate: string;
   gender: string;
   address: string;
@@ -45,7 +45,7 @@ export default function AddEmployeeModal({
     phoneNumber: '',
     departmentId: '',
     titleId: '',
-    startDate: '',
+    contractStartDate: '',
     birthDate: '',
     gender: '',
     address: '',
@@ -90,7 +90,7 @@ export default function AddEmployeeModal({
         phoneNumber: '',
         departmentId: '',
         titleId: '',
-        startDate: '',
+        contractStartDate: '',
         birthDate: '',
         gender: '',
         address: '',
@@ -118,7 +118,7 @@ export default function AddEmployeeModal({
       phoneNumber: '',
       departmentId: '',
       titleId: '',
-      startDate: '',
+      contractStartDate: '',
       birthDate: '',
       gender: '',
       address: '',
@@ -306,8 +306,8 @@ export default function AddEmployeeModal({
               </label>
               <input
                 type="date"
-                name="startDate"
-                value={formData.startDate}
+                name="contractStartDate"
+                value={formData.contractStartDate}
                 onChange={handleInputChange}
                 className="form-input"
               />

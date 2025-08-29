@@ -25,6 +25,7 @@ export default function HeadDashboard({
   onViewAllMeetings 
 }: HeadDashboardProps) {
   const { user, token, getUserDetails } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     departmentEmployees: 0,
     departmentOpenTasks: 0,
@@ -47,6 +48,7 @@ export default function HeadDashboard({
     }
     
     const loadData = async () => {
+      setLoading(true);
       try {
         const [userRes, myTasksRes, myMeetingsRes] = await Promise.all([
           fetch(`http://localhost:8081/api/people?size=1&email=${encodeURIComponent(user.email)}`, {
@@ -141,6 +143,8 @@ export default function HeadDashboard({
         setMyMeetings(sortedMeetings);
       } catch (error) {
         console.error('Error loading head dashboard data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -210,6 +214,15 @@ export default function HeadDashboard({
       console.error('Error closing task:', error);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="org-chart-loading">
+        <div className="org-chart-spinner"></div>
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-container">

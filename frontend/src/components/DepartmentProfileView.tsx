@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import '../styles/people.css';
 import { ReactComponent as ChevronDownIcon } from '../icons/chevron-down.svg';
 import { ReactComponent as EditIcon } from '../icons/edit.svg';
@@ -17,13 +17,18 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
   onPersonClick?: (person: PersonModel) => void; 
 }) {
   const { user, token } = useAuth();
-  const head = department.headOfDepartment ? department.headOfDepartment : null;
-  const employees: PersonModel[] = department.employees ? department.employees : [];
+  const [localDepartment, setLocalDepartment] = useState(department);
+  const head = localDepartment.headOfDepartment ? localDepartment.headOfDepartment : null;
+  const employees: PersonModel[] = localDepartment.employees ? localDepartment.employees : [];
   const [isEdit, setIsEdit] = useState(false);
   const [form, setForm] = useState({
-    name: department.name || '',
-    color: department.color || ''
+    name: localDepartment.name || '',
+    color: localDepartment.color || ''
   });
+
+  useEffect(() => {
+    setLocalDepartment(department);
+  }, [department]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -33,8 +38,8 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
   const onEditToggle = () => {
     if (!isEdit) {
       setForm({ 
-        name: department.name || '', 
-        color: department.color || ''
+        name: localDepartment.name || '', 
+        color: localDepartment.color || ''
       });
     }
     setIsEdit(!isEdit);
@@ -43,7 +48,7 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
   const onSave = async () => {
     try {
       const payload = { name: form.name, color: form.color };
-      const response = await fetch(`http://localhost:8081/api/departments/${department.id}`, {
+      const response = await fetch(`http://localhost:8081/api/departments/${localDepartment.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +59,12 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
       
       if (response.ok) {
         const updatedDepartment = await response.json();
-        onDepartmentUpdate?.(updatedDepartment);
+        const mergedDepartment = {
+          ...localDepartment,
+          ...updatedDepartment
+        };
+        setLocalDepartment(mergedDepartment);
+        onDepartmentUpdate?.(mergedDepartment);
       }
       setIsEdit(false);
     } catch (error) {
@@ -63,11 +73,11 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
   };
 
   const onDelete = async () => {
-    const confirmMessage = `Are you sure you want to delete the "${department.name}" department? This action cannot be undone.`;
+    const confirmMessage = `Are you sure you want to delete the "${localDepartment.name}" department? This action cannot be undone.`;
     
     if (window.confirm(confirmMessage)) {
       try {
-        const response = await fetch(`http://localhost:8081/api/departments/${department.id}`, {
+        const response = await fetch(`http://localhost:8081/api/departments/${localDepartment.id}`, {
           method: 'DELETE',
           headers: {
             Authorization: token ? `Bearer ${token}` : ''
@@ -97,9 +107,9 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
         <div className="profile-nav-preview">
           <div 
             className={`profile-nav-photo dept-color-dot ${isEdit ? 'edit-mode' : ''}`} 
-            style={{ '--dept-color': isEdit ? form.color || '#64748b' : department.color || '#64748b' } as React.CSSProperties}
+            style={{ '--dept-color': isEdit ? form.color || '#64748b' : localDepartment.color || '#64748b' } as React.CSSProperties}
           />
-          <span className="profile-nav-name">{isEdit ? form.name : department.name}</span>
+          <span className="profile-nav-name">{isEdit ? form.name : localDepartment.name}</span>
         </div>
         {user?.role === 'ADMIN' && (
           <div className="profile-actions">
@@ -135,10 +145,10 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
           <div className="dept-header-card">
             <div 
               className="dept-color-indicator" 
-              style={{ '--dept-color': department.color || '#64748b' } as React.CSSProperties}
+              style={{ '--dept-color': localDepartment.color || '#64748b' } as React.CSSProperties}
             />
             <div className="dept-summary">
-              <h2 className="dept-title">{department.name}</h2>
+              <h2 className="dept-title">{localDepartment.name}</h2>
               <div className="dept-stats">
                 <div className="stat-item">
                   <UsersIcon width={16} height={16} />
@@ -163,7 +173,7 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
                 type="text" 
                 className="field-input base-input" 
                 name="name" 
-                value={isEdit ? form.name : department.name} 
+                value={isEdit ? form.name : localDepartment.name} 
                 onChange={onChange} 
                 readOnly={!isEdit} 
               />
@@ -176,15 +186,15 @@ export default function DepartmentProfileView({ department, onBack, onDepartment
                   type="text" 
                   className="field-input base-input" 
                   name="color" 
-                  value={isEdit ? form.color : department.color || ''} 
+                  value={isEdit ? form.color : localDepartment.color || ''} 
                   placeholder="#64748b" 
                   onChange={onChange} 
                   readOnly={!isEdit} 
                 />
-                {(isEdit ? form.color : department.color) && (
+                {(isEdit ? form.color : localDepartment.color) && (
                   <div 
                     className="color-preview" 
-                    style={{ '--preview-color': isEdit ? form.color : department.color } as React.CSSProperties}
+                    style={{ '--preview-color': isEdit ? form.color : localDepartment.color } as React.CSSProperties}
                   />
                 )}
               </div>

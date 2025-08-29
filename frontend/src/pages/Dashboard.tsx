@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import AdminDashboard from '../components/dashboard/AdminDashboard';
 import HRDashboard from '../components/dashboard/HRDashboard';
 import HeadDashboard from '../components/dashboard/HeadDashboard';
@@ -30,6 +31,8 @@ export default function Dashboard() {
   const [showAddTitleForm, setShowAddTitleForm] = useState(false);
   const [showCreateTaskForm, setShowCreateTaskForm] = useState(false);
   const [showCreateMeetingForm, setShowCreateMeetingForm] = useState(false);
+  const [dashVersion, setDashVersion] = useState(0);
+  const bumpDashboard = () => setDashVersion(v => v + 1);
   const [viewAllMode, setViewAllMode] = useState<'none' | 'tasks' | 'meetings'>('none');
   const [viewAllData, setViewAllData] = useState<{ tasks: Task[], meetings: Meeting[] }>({ tasks: [], meetings: [] });
   const [viewAllTitle, setViewAllTitle] = useState('');
@@ -47,6 +50,7 @@ export default function Dashboard() {
   const [viewAllMeetingOrganizerFilter, setViewAllMeetingOrganizerFilter] = useState('');
   const [viewAllMeetingParticipantFilter, setViewAllMeetingParticipantFilter] = useState('');
   
+  const { departments: depState, titles: titleState, people: peopleState, refreshAll } = useData();
   const [taskCreators, setTaskCreators] = useState<Person[]>([]);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
   
@@ -57,72 +61,50 @@ export default function Dashboard() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [titles, setTitles] = useState<Title[]>([]);
 
-  useEffect(() => {
+
+  const refreshMetadata = async () => {
     if (!token) return;
-    
-    const loadMetadata = async () => {
-      try {
-        const [depRes, titleRes] = await Promise.all([
-          fetch('http://localhost:8081/api/departments', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch('http://localhost:8081/api/titles', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-        ]);
-        
-        if (depRes.ok) {
-          const deps = await depRes.json();
-          const ordered = [...deps].sort((a: Department, b: Department) => a.name.localeCompare(b.name));
-          setDepartments(ordered);
-        }
-        
-        if (titleRes.ok) {
-          const tits = await titleRes.json();
-          const ordered = [...tits].sort((a: Title, b: Title) => a.name.localeCompare(b.name));
-          setTitles(ordered);
-        }
-
-
-      } catch (err) {
-        console.error('Error loading metadata:', err);
+    try {
+      const [depRes, titleRes] = await Promise.all([
+        fetch('http://localhost:8081/api/departments', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch('http://localhost:8081/api/titles', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      if (depRes.ok) {
+        const deps = await depRes.json();
+        const ordered = [...deps].sort((a: Department, b: Department) => a.name.localeCompare(b.name));
+        setDepartments(ordered);
       }
-    };
-    
-    loadMetadata();
-  }, [token]);
+      if (titleRes.ok) {
+        const tits = await titleRes.json();
+        const ordered = [...tits].sort((a: Title, b: Title) => a.name.localeCompare(b.name));
+        setTitles(ordered);
+      }
+    } catch (err) {
+      console.error('Error loading metadata:', err);
+    }
+  };
 
   useEffect(() => {
-    if (!token) return;
-    
-    const loadFilterData = async () => {
-      try {
-        const [peopleRes] = await Promise.all([
-          fetch('http://localhost:8081/api/people?page=0&size=1000', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-        ]);
-        
-        if (peopleRes.ok) {
-          const data = await peopleRes.json();
-          const people: Person[] = Array.isArray(data) ? data : (data?.content || []);
-          setAllPeople(people);
-          
-          const creators = people.filter(p => 
-            p.title?.name?.includes('HR') || 
-            p.title?.name?.includes('Head') ||
-            p.title?.name?.includes('Manager') ||
-            p.title?.name?.includes('Director')
-          );
-          setTaskCreators(creators);
-        }
-      } catch (err) {
-        console.error('Error loading filter data:', err);
-      }
-    };
-    
-    loadFilterData();
-  }, [token]);
+    setDepartments(depState.data);
+    setTitles(titleState.data);
+  }, [depState.data, titleState.data]);
+
+
+  useEffect(() => {
+    const people = peopleState.data;
+    setAllPeople(people);
+    const creators = people.filter(p => 
+      p.title?.name?.includes('HR') || 
+      p.title?.name?.includes('Head') ||
+      p.title?.name?.includes('Manager') ||
+      p.title?.name?.includes('Director')
+    );
+    setTaskCreators(creators);
+  }, [peopleState.data]);
 
 
 
@@ -228,6 +210,9 @@ export default function Dashboard() {
     if (!response.ok) {
       throw new Error('Failed to add employee');
     }
+    await refreshAll(true);
+    setShowAddEmployeeForm(false);
+    bumpDashboard();
   };
 
   const handleAddDepartment = async (formData: any) => {
@@ -254,14 +239,9 @@ export default function Dashboard() {
         throw new Error('Failed to create department');
       }
     }
-    
-    const [deps, tits] = await Promise.all([
-      fetch('http://localhost:8081/api/departments', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('http://localhost:8081/api/titles', { headers: { Authorization: `Bearer ${token}` } })
-    ]);
-    
-    if (deps.ok) setDepartments(await deps.json());
-    if (tits.ok) setTitles(await tits.json());
+    await refreshAll(true);
+    setShowAddDepartmentForm(false);
+    bumpDashboard();
   };
 
   const handleAddTitle = async (formData: any) => {
@@ -287,9 +267,9 @@ export default function Dashboard() {
         throw new Error('Failed to create title');
       }
     }
-    
-    const tits = await fetch('http://localhost:8081/api/titles', { headers: { Authorization: `Bearer ${token}` } });
-    if (tits.ok) setTitles(await tits.json());
+    await refreshAll(true);
+    setShowAddTitleForm(false);
+    bumpDashboard();
   };
 
   const handleCreateTask = async (formData: any) => {
@@ -313,6 +293,9 @@ export default function Dashboard() {
     if (!res.ok) {
       throw new Error('Failed to create task');
     }
+    await refreshAll(true);
+    setShowCreateTaskForm(false);
+    bumpDashboard();
   };
 
   const handleCreateMeeting = async (formData: any) => {
@@ -340,6 +323,9 @@ export default function Dashboard() {
     if (!res.ok) {
       throw new Error('Failed to create meeting');
     }
+    await refreshAll(true);
+    setShowCreateMeetingForm(false);
+    bumpDashboard();
   };
 
   const renderDashboard = () => {
@@ -347,7 +333,8 @@ export default function Dashboard() {
       case 'ADMIN':
         return (
           <AdminDashboard
-            onShowAddEmployee={() => setShowAddEmployeeForm(true)}
+            key={`dash-${dashVersion}-admin`}
+            onShowAddEmployee={async () => { await refreshMetadata(); setShowAddEmployeeForm(true); }}
             onShowAddDepartment={() => setShowAddDepartmentForm(true)}
             onShowAddTitle={() => setShowAddTitleForm(true)}
             onShowCreateTask={() => setShowCreateTaskForm(true)}
@@ -382,7 +369,8 @@ export default function Dashboard() {
       case 'HR':
         return (
           <HRDashboard
-            onShowAddEmployee={() => setShowAddEmployeeForm(true)}
+            key={`dash-${dashVersion}-hr`}
+            onShowAddEmployee={async () => { await refreshMetadata(); setShowAddEmployeeForm(true); }}
             onShowCreateTask={() => setShowCreateTaskForm(true)}
             onShowCreateMeeting={() => setShowCreateMeetingForm(true)}
             onViewAllTasks={(tasks: Task[], title: string) => {
@@ -415,6 +403,7 @@ export default function Dashboard() {
       case 'HEAD':
         return (
           <HeadDashboard
+            key={`dash-${dashVersion}-head`}
             onShowCreateTask={() => setShowCreateTaskForm(true)}
             onShowCreateMeeting={() => setShowCreateMeetingForm(true)}
             onViewAllTasks={(tasks: Task[], title: string) => {
@@ -448,6 +437,7 @@ export default function Dashboard() {
       default:
         return (
           <EmployeeDashboard
+            key={`dash-${dashVersion}-employee`}
             onViewAllTasks={(tasks: Task[], title: string) => {
               setViewAllMode('tasks');
               setViewAllData({ tasks, meetings: [] });
@@ -927,6 +917,7 @@ export default function Dashboard() {
 
     return null;
   };
+
 
   return (
     <>

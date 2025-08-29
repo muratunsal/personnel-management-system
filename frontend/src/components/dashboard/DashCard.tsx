@@ -4,9 +4,10 @@ interface DashCardProps {
   subtitle?: string;
   icon?: React.ReactNode;
   color: string;
+  valueClassName?: string;
 }
 
-export default function DashCard({ title, value, subtitle, icon, color }: DashCardProps) {
+export default function DashCard({ title, value, subtitle, icon, color, valueClassName }: DashCardProps) {
   return (
     <div 
       className="dash-card dash-card-dynamic"
@@ -23,7 +24,7 @@ export default function DashCard({ title, value, subtitle, icon, color }: DashCa
           {icon}
         </div>
       </div>
-      <div className="dash-card-value">{value}</div>
+      <div className={`dash-card-value ${valueClassName ?? ''}`}>{value}</div>
       
       <div className="dash-card-content">
         <div className="dash-card-title">{title}</div>

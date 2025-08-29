@@ -16,6 +16,7 @@ interface EmployeeDashboardProps {
 
 export default function EmployeeDashboard({ onViewAllTasks, onViewAllMeetings }: EmployeeDashboardProps) {
   const { user, token } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     openTasks: 0,
     completedTasks: 0,
@@ -35,6 +36,7 @@ export default function EmployeeDashboard({ onViewAllTasks, onViewAllMeetings }:
     if (!token || !user?.email) return;
     
     const loadData = async () => {
+      setLoading(true);
       try {
         const [userRes, myTasksRes, myMeetingsRes] = await Promise.all([
           fetch(`http://localhost:8081/api/people?size=1&email=${encodeURIComponent(user.email)}`, {
@@ -126,6 +128,8 @@ export default function EmployeeDashboard({ onViewAllTasks, onViewAllMeetings }:
 
       } catch (error) {
         console.error('Error loading employee dashboard data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -156,6 +160,15 @@ export default function EmployeeDashboard({ onViewAllTasks, onViewAllMeetings }:
       console.error('Error updating task status:', error);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="org-chart-loading">
+        <div className="org-chart-spinner"></div>
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-container">
