@@ -5,10 +5,10 @@ import { ReactComponent as SearchIcon } from "../icons/search.svg";
 import { ReactComponent as ChevronUpIcon } from "../icons/chevron-up.svg";
 import { ReactComponent as ChevronDownIcon } from "../icons/chevron-down.svg";
 import { ReactComponent as UserAvatarIcon } from "../icons/user-avatar.svg";
+import { ReactComponent as EyeIcon } from "../icons/eye.svg";
 import PersonProfileView from "../components/PersonProfileView";
-import type { Department, TitleEntity, Person } from "../types/models";
-
-
+import { useAuth } from "../context/AuthContext";
+import type { Department, Title, Person } from "../types/models";
 
 type SortState = { sortBy: keyof Person | "id" | "person" | "department.name" | "title.name"; direction: "asc" | "desc" };
 
@@ -27,6 +27,7 @@ const defaultFilters: Filters = {
 };
 
 export default function People() {
+  const { isAuthenticated, token } = useAuth();
   const [rows, setRows] = useState<Person[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -34,46 +35,67 @@ export default function People() {
   const [sort, setSort] = useState<SortState>({ sortBy: "id", direction: "asc" });
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [titles, setTitles] = useState<TitleEntity[]>([]);
+  const [titles, setTitles] = useState<Title[]>([]);
 
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
 
-  const columns: Array<{ key: keyof Person | "id" | "person" | "actions"; label: string }> = useMemo(
+  const columns: Array<{ key: keyof Person | "person" | "actions"; label: string; visible: boolean }> = useMemo(
     () => [
-      { key: "person", label: "Person" },
-      { key: "email", label: "Email" },
-      { key: "phoneNumber", label: "Phone" },
-      { key: "department", label: "Department" },
-      { key: "title", label: "Title" },
-      { key: "gender", label: "Gender" },
-      { key: "address", label: "Address" },
-      { key: "actions", label: "" },
+      { key: "person", label: "Person", visible: true },
+      { key: "email", label: "Email", visible: true },
+      { key: "phoneNumber", label: "Phone", visible: true },
+      { key: "department", label: "Department", visible: true },
+      { key: "title", label: "Title", visible: true },
+      { key: "gender", label: "Gender", visible: true },
+      { key: "actions", label: "", visible: true },
     ],
     []
   );
 
+  const visibleColumns = columns.filter(col => col.visible);
+
   useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    
     const loadMeta = async () => {
       try {
         const [depRes, titleRes] = await Promise.all([
-          axios.get<Department[]>("http://localhost:8081/api/departments"),
-          axios.get<TitleEntity[]>("http://localhost:8081/api/titles"),
+          axios.get<Department[]>("http://localhost:8081/api/departments", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get<Title[]>("http://localhost:8081/api/titles", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
         ]);
-        setDepartments(depRes.data);
-        setTitles(titleRes.data);
-      } catch {
+        const orderedDepartments = [...depRes.data].sort((a, b) => a.name.localeCompare(b.name));
+        const orderedTitles = [...titleRes.data].sort((a, b) => a.name.localeCompare(b.name));
+        setDepartments(orderedDepartments);
+        setTitles(orderedTitles);
+      } catch (error) {
+        console.error("Error loading metadata:", error);
       }
     };
     loadMeta();
-  }, []);
+  }, [isAuthenticated, token]);
+
+  const getOrderedTitlesForDepartment = (departmentId: number) => {
+    const dep = departments.find(d => d.id === departmentId);
+    const headName = dep ? `Head of ${dep.name}` : "";
+    const hasHead = !!dep?.headOfDepartment;
+    const list = titles.filter(t => t.department?.id === departmentId);
+    const filtered = hasHead ? list.filter(t => t.name !== headName) : list;
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+  };
 
   useEffect(() => {
-    if (selectedPerson) return;
+    if (!isAuthenticated || !token || selectedPerson) return;
+    
     const fetchData = async () => {
       setLoading(true);
       setError(null);
@@ -84,12 +106,17 @@ export default function People() {
           sortBy: sort.sortBy,
           direction: sort.direction,
         };
+        
         Object.entries(filters).forEach(([k, v]) => {
           if (v) params[k] = v;
         });
+        
         const res = await axios.get(
           "http://localhost:8081/api/people",
-          { params }
+          { 
+            params,
+            headers: { Authorization: `Bearer ${token}` }
+          }
         );
         const data: any = res.data;
         const content: Person[] = Array.isArray(data) ? data : (data?.content ?? []);
@@ -103,7 +130,7 @@ export default function People() {
       }
     };
     fetchData();
-  }, [page, size, sort, filters, selectedPerson]);
+  }, [page, size, sort, filters, selectedPerson, isAuthenticated, token]);
 
   const toggleSort = (key: keyof Person | "id" | "person" | "actions") => {
     if (key === "actions") return;
@@ -119,6 +146,11 @@ export default function People() {
 
   const handlePersonClick = (person: Person) => {
     setSelectedPerson(person);
+  };
+
+  const handlePersonUpdate = (updatedPerson: Person) => {
+    setSelectedPerson(updatedPerson);
+    setRows(prev => prev.map(p => p.id === updatedPerson.id ? updatedPerson : p));
   };
 
   const activeFilters = useMemo(() => {
@@ -137,18 +169,20 @@ export default function People() {
   }, [filters, departments, titles]);
 
   const clearFilter = (key: keyof Filters) => {
-    if (key === "q") setSearch("");
     setFilters((f) => ({ ...f, [key]: "" }));
     setPage(0);
   };
 
   const clearAllFilters = () => {
-    setSearch("");
     setFilters(defaultFilters);
     setPage(0);
   };
 
   const hasActiveFilters = activeFilters.length > 0;
+
+  if (!isAuthenticated) {
+    return <div className="people-container">Please log in to view people data.</div>;
+  }
 
   if (selectedPerson) {
     return (
@@ -156,6 +190,7 @@ export default function People() {
         <PersonProfileView
           person={selectedPerson}
           onBack={() => setSelectedPerson(null)}
+          onPersonUpdate={handlePersonUpdate}
         />
       </div>
     );
@@ -175,21 +210,21 @@ export default function People() {
           <SearchIcon className="search-icon" width={18} height={18} />
           <input
             className="people-search-input base-input"
-            placeholder="Search by name, email, phone, address..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, email, phone..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                setFilters((f) => ({ ...f, q: search }));
+                setFilters((f) => ({ ...f, q: searchInput }));
                 setPage(0);
               }
             }}
           />
-          {search && (
+          {searchInput && (
             <button 
               className="search-clear base-button"
               onClick={() => {
-                setSearch("");
+                setSearchInput("");
                 setFilters((f) => ({ ...f, q: "" }));
                 setPage(0);
               }}
@@ -232,7 +267,10 @@ export default function People() {
                 <select
                   className="filter-dropdown base-input"
                   value={filters.departmentId}
-                  onChange={(e) => { setFilters({ ...filters, departmentId: e.target.value }); setPage(0); }}
+                  onChange={(e) => { 
+                    setFilters({ ...filters, departmentId: e.target.value, titleId: "" }); 
+                    setPage(0); 
+                  }}
                 >
                   <option value="">All Departments</option>
                   {departments.map((d) => (
@@ -249,9 +287,10 @@ export default function People() {
                   className="filter-dropdown base-input"
                   value={filters.titleId}
                   onChange={(e) => { setFilters({ ...filters, titleId: e.target.value }); setPage(0); }}
+                  disabled={!filters.departmentId}
                 >
-                  <option value="">All Titles</option>
-                  {titles.map((t) => (
+                  <option value="">{filters.departmentId ? "All Titles" : "Select Department First"}</option>
+                  {filters.departmentId && getOrderedTitlesForDepartment(parseInt(filters.departmentId)).map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
                 </select>
@@ -295,7 +334,7 @@ export default function People() {
         <table className="people-table">
           <thead>
             <tr>
-              {columns.map((c) => (
+              {visibleColumns.map((c) => (
                 <th key={c.key as string} className={c.key === "actions" ? "" : "sortable"} onClick={() => toggleSort(c.key)}>
                   {c.label}
                   {c.key !== "actions" && (
@@ -314,19 +353,20 @@ export default function People() {
                 <td className="clickable-cell" onClick={() => handlePersonClick(p)}>{p.email}</td>
                 <td className="clickable-cell" onClick={() => handlePersonClick(p)}>{p.phoneNumber ?? "-"}</td>
                 <td className="clickable-cell" onClick={() => handlePersonClick(p)}>{p.department?.name ?? "-"}</td>
-                <td className="clickable-cell" onClick={() => handlePersonClick(p)}>{p.title?.name ?? "-"}</td>
+                <td className="clickable-cell" onClick={() => handlePersonClick(p)}>
+                  {p.title?.name ?? "-"}
+                </td>
                 <td className="clickable-cell" onClick={() => handlePersonClick(p)}>{p.gender ?? "-"}</td>
-                <td className="clickable-cell" onClick={() => handlePersonClick(p)}>{p.address ?? "-"}</td>
                 <td className="actions-cell">
                   <button 
                     className="actions-button base-button"
                     onClick={(e) => {
                       e.stopPropagation();
-  
+                      handlePersonClick(p);
                     }}
-                    title="More actions"
+                    title="View profile"
                   >
-                    •••
+                    <EyeIcon width={20} height={20} />
                   </button>
                 </td>
               </tr>

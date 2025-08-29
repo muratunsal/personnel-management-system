@@ -1,26 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
-import type { Person as PersonModel, Department as DepartmentModel } from '../types/models';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
+import type { Person, Department } from '../types/models';
 import { ReactComponent as UserAvatarIcon } from '../icons/user-avatar.svg';
 import '../styles/organization.css';
-
-interface OrgPerson {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  title: {
-    name: string;
-  };
-  profilePictureUrl?: string | null;
-}
-
-interface Department {
-  id: number;
-  name: string;
-  color: string;
-  headOfDepartment: OrgPerson | null;
-  employees: OrgPerson[];
-}
 
 interface OrganizationData {
   departments: Department[];
@@ -31,15 +13,15 @@ function Avatar({ url, color, alt }: { url?: string | null; color: string; alt: 
   const hasImage = !!url && !error;
   return (
     <div
-      className="org-chart-person-avatar"
-      style={{ backgroundColor: hasImage ? 'transparent' : color, color: hasImage ? undefined : '#ffffff', overflow: 'hidden' }}
+      className={`org-chart-person-avatar ${hasImage ? 'has-image' : 'no-image'}`}
+      style={{ '--avatar-color': color } as React.CSSProperties}
     >
       {hasImage ? (
         <img
           src={url as string}
           alt={alt}
           onError={() => setError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          className="org-chart-avatar-img"
         />
       ) : (
         <UserAvatarIcon width={20} height={20} />
@@ -48,7 +30,8 @@ function Avatar({ url, color, alt }: { url?: string | null; color: string; alt: 
   );
 }
 
-export default function OrganizationChart({ onPersonClick, onDepartmentClick }: { onPersonClick?: (p: PersonModel) => void; onDepartmentClick?: (d: DepartmentModel) => void } = {}) {
+function OrganizationChart({ onPersonClick, onDepartmentClick }: { onPersonClick?: (p: Person) => void; onDepartmentClick?: (d: Department) => void } = {}) {
+  const { isAuthenticated, token } = useAuth();
   const [data, setData] = useState<OrganizationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [scale, setScale] = useState(0.8);
@@ -57,21 +40,41 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchOrganizationData();
-  }, []);
-
-  const fetchOrganizationData = async () => {
+  const fetchOrganizationData = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8081/api/departments/organization-structure');
-      const orgData = await response.json();
-      setData(orgData);
+      const response = await fetch('http://localhost:8081/api/departments/organization-structure', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const orgData: OrganizationData = await response.json();
+      const orderedDepartments = [...orgData.departments]
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const normalized: OrganizationData = {
+        departments: orderedDepartments.map(d => ({
+          ...d,
+          employees: [...(d.employees || [])].sort((a, b) => {
+            const aName = a.title?.name || '';
+            const bName = b.title?.name || '';
+            const headName = `Head of ${d.name}`;
+            if (aName === headName && bName !== headName) return -1;
+            if (bName === headName && aName !== headName) return 1;
+            return aName.localeCompare(bName);
+          })
+        }))
+      };
+      setData(normalized);
     } catch (error) {
       console.error('Error fetching organization data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    fetchOrganizationData();
+  }, [isAuthenticated, token, fetchOrganizationData]);
 
   const DEPT_SPACING = 420;
   const MAIN_LINE_Y = 100;
@@ -186,10 +189,10 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
           {data.departments.map((dept, deptIndex) => {
             const deptX = startX + (deptIndex * DEPT_SPACING);
             const deptCenterX = deptX + DEPT_WIDTH / 2;
-            const sortedEmployees = [...dept.employees].sort((a, b) => a.id - b.id);
-            const bottomY = sortedEmployees.length > 0
-              ? EMPLOYEE_START_Y + (sortedEmployees.length - 1) * EMPLOYEE_SPACING_Y + CARD_HEIGHT / 2
-              : HEAD_Y + CARD_HEIGHT;
+                      const sortedEmployees = dept.employees || [];
+          const bottomY = sortedEmployees.length > 0
+            ? EMPLOYEE_START_Y + (sortedEmployees.length - 1) * EMPLOYEE_SPACING_Y + CARD_HEIGHT / 2
+            : HEAD_Y + CARD_HEIGHT;
 
 
             return (
@@ -211,7 +214,7 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
           const deptCenterX = deptX + DEPT_WIDTH / 2;
 
 
-          const sortedEmployees = [...dept.employees].sort((a, b) => a.id - b.id);
+          const sortedEmployees = dept.employees || [];
 
 
           return (
@@ -223,8 +226,7 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
                   left: deptX,
                   top: DEPT_Y,
                   width: DEPT_WIDTH,
-
-                  ['--dept-color' as any]: dept.color
+                  ['--dept-color' as any]: dept.color || '#64748b'
                 }}
                 onClick={() => onDepartmentClick?.({
                   id: dept.id,
@@ -236,18 +238,18 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
                         firstName: dept.headOfDepartment.firstName,
                         lastName: dept.headOfDepartment.lastName,
                         email: dept.headOfDepartment.email,
-                        title: { name: dept.headOfDepartment.title.name },
+                        title: { name: dept.headOfDepartment.title?.name || 'No Title' },
                         profilePictureUrl: dept.headOfDepartment.profilePictureUrl ?? undefined,
-                      } as unknown as PersonModel
+                      } as Person
                     : null,
-                  employees: dept.employees.map(e => ({
+                                      employees: (dept.employees || []).map(e => ({
                     id: e.id,
                     firstName: e.firstName,
                     lastName: e.lastName,
                     email: e.email,
-                    title: { name: e.title.name },
-                    profilePictureUrl: e.profilePictureUrl ?? undefined,
-                  } as unknown as PersonModel)),
+                                            title: { name: e.title?.name || 'No Title' },
+                                          profilePictureUrl: e.profilePictureUrl ?? undefined,
+                    } as Person)),
                 })}
                 role="button"
                 tabIndex={0}
@@ -256,24 +258,23 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
               </div>
 
 
-              {dept.headOfDepartment && (
+              {dept.headOfDepartment ? (
                 <>
-
                   <div
                     className="org-chart-head-card"
                     style={{
                       left: deptX,
                       top: HEAD_Y,
-                      ['--dept-color' as any]: dept.color,
+                      ['--dept-color' as any]: dept.color || '#64748b',
                       ['--card-width' as any]: `${CARD_WIDTH}px`
                     }}
-                    onClick={() => onPersonClick?.(dept.headOfDepartment as unknown as PersonModel)}
+                    onClick={() => onPersonClick?.(dept.headOfDepartment as Person)}
                     role="button"
                     tabIndex={0}
                   >
                     <Avatar
                       url={dept.headOfDepartment.profilePictureUrl}
-                      color={dept.color}
+                      color={dept.color || '#64748b'}
                       alt={`${dept.headOfDepartment.firstName} ${dept.headOfDepartment.lastName}`}
                     />
                     <div className="org-chart-person-info">
@@ -281,11 +282,10 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
                         {dept.headOfDepartment.firstName} {dept.headOfDepartment.lastName}
                       </div>
                       <div className="org-chart-person-title">
-                        {dept.headOfDepartment.title.name}
+                        {dept.headOfDepartment.title?.name || 'No Title'}
                       </div>
                     </div>
                   </div>
-
 
                   <svg className="org-chart-svg" width={svgWidth} height={20000}>
                     <path
@@ -297,57 +297,71 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
                       filter="drop-shadow(0 1px 2px rgba(156, 163, 175, 0.2))"
                     />
                   </svg>
+                </>
+              ) : (
+                <div
+                  className="org-chart-head-card org-chart-placeholder-head"
+                  style={{
+                    left: deptX,
+                    top: HEAD_Y,
+                    ['--card-width' as any]: `${CARD_WIDTH}px`
+                  }}
+                >
+                  <div className="org-chart-person-avatar org-chart-placeholder-avatar">
+                    <UserAvatarIcon width={20} height={20} />
+                  </div>
+                  <div className="org-chart-person-info">
+                    <div className="org-chart-person-name org-chart-placeholder-text">
+                      No Head
+                    </div>
+                  </div>
+                </div>
+              )}
 
+              {sortedEmployees.map((employee, empIndex) => {
+                const empY = EMPLOYEE_START_Y + (empIndex * EMPLOYEE_SPACING_Y);
+                
+                return (
+                  <div key={employee.id}>
+                    <svg className="org-chart-svg" width={svgWidth} height={20000}>
+                      <path
+                        d={`M ${deptCenterX} ${empY + CARD_HEIGHT / 2} H ${deptX + (DEPT_WIDTH - CARD_WIDTH)}`}
+                        stroke={CONNECTOR_COLOR}
+                        strokeWidth={4}
+                        fill="none"
+                        strokeLinecap="round"
+                        filter="drop-shadow(0 1px 2px rgba(156, 163, 175, 0.2))"
+                      />
+                    </svg>
 
-                  {sortedEmployees.map((employee, empIndex) => {
-                    const empY = EMPLOYEE_START_Y + (empIndex * EMPLOYEE_SPACING_Y);
-                    
-                    return (
-                      <div key={employee.id}>
-
-                        <svg className="org-chart-svg" width={svgWidth} height={20000}>
-
-                          <path
-                            d={`M ${deptCenterX} ${empY + CARD_HEIGHT / 2} H ${deptX + (DEPT_WIDTH - CARD_WIDTH)}`}
-                            stroke={CONNECTOR_COLOR}
-                            strokeWidth={4}
-                            fill="none"
-                            strokeLinecap="round"
-                            filter="drop-shadow(0 1px 2px rgba(156, 163, 175, 0.2))"
-                          />
-                        </svg>
-
-
-                        <div
-                          className="org-chart-employee-card"
-                          style={{
-                            left: deptX + (DEPT_WIDTH - CARD_WIDTH),
-                            top: empY,
-                            ['--card-width' as any]: `${CARD_WIDTH}px`
-                          }}
-                          onClick={() => onPersonClick?.(employee as unknown as PersonModel)}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <Avatar
-                            url={employee.profilePictureUrl}
-                            color={dept.color}
-                            alt={`${employee.firstName} ${employee.lastName}`}
-                          />
-                          <div className="org-chart-person-info">
-                            <div className="org-chart-person-name">
-                              {employee.firstName} {employee.lastName}
-                            </div>
-                            <div className="org-chart-person-title">
-                              {employee.title.name}
-                            </div>
-                          </div>
+                    <div
+                      className="org-chart-employee-card"
+                      style={{
+                        left: deptX + (DEPT_WIDTH - CARD_WIDTH),
+                        top: empY,
+                        ['--card-width' as any]: `${CARD_WIDTH}px`
+                      }}
+                      onClick={() => onPersonClick?.(employee as Person)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <Avatar
+                        url={employee.profilePictureUrl}
+                        color={dept.color || '#64748b'}
+                        alt={`${employee.firstName} ${employee.lastName}`}
+                      />
+                      <div className="org-chart-person-info">
+                        <div className="org-chart-person-name">
+                          {employee.firstName} {employee.lastName}
+                        </div>
+                        <div className="org-chart-person-title">
+                          {employee.title?.name || 'No Title'}
                         </div>
                       </div>
-                    );
-                  })}
-                </>
-              )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -355,3 +369,5 @@ export default function OrganizationChart({ onPersonClick, onDepartmentClick }: 
     </div>
   );
 }
+
+export default OrganizationChart;

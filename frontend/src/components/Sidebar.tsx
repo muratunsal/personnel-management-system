@@ -1,15 +1,14 @@
 import { useTabs } from '../context/TabsContext';
+import { useAuth } from '../context/AuthContext';
 import { ReactComponent as DashboardIcon } from '../icons/dashboard.svg';
 import { ReactComponent as UsersIcon } from '../icons/users.svg';
 import { ReactComponent as OrganizationIcon } from '../icons/organization.svg';
-import { ReactComponent as MessagesIcon } from '../icons/messages.svg';
-import { ReactComponent as CalendarIcon } from '../icons/calendar.svg';
-import { ReactComponent as SettingsIcon } from '../icons/settings.svg';
 import { ReactComponent as LogoIcon } from '../icons/logo.svg';
 import { ReactComponent as LogoutIcon } from '../icons/logout.svg';
 
 export function Sidebar() {
   const { activeTab, setActiveTab } = useTabs();
+  const { logout } = useAuth();
 
   return (
     <aside className="sidebar">
@@ -45,38 +44,12 @@ export function Sidebar() {
           <span>Organization</span>
         </button>
 
-        <button
-          className={`tab-button ${activeTab === 'Messages' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Messages')}
-          type="button"
-        >
-          <MessagesIcon/>
-          <span>Messages</span>
-        </button>
-
-        <button
-          className={`tab-button ${activeTab === 'Calendar' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Calendar')}
-          type="button"
-        >
-          <CalendarIcon/>
-          <span>Calendar</span>
-        </button>
       </nav>
 
       <div className="sidebar-footer">
         <button
-          className={`tab-button ${activeTab === 'Settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('Settings')}
-          type="button"
-        >
-          <SettingsIcon/>
-          <span>Settings</span>
-        </button>
-
-        <button
           className="logout-button"
-          onClick={() => {}}
+          onClick={logout}
           type="button"
         >
           <LogoutIcon/>

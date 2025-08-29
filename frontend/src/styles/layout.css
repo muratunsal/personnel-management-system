@@ -59,45 +59,6 @@ body {
   justify-content: flex-start;
 }
 
-.search-wrapper {
-  position: relative;
-  width: 250px;
-  flex: 0 0 250px;
-}
-
-.search-input {
-  width: 100%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  border-radius: 30px;
-  padding: 12px 44px;
-  outline: none;
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
-}
-
-.search-input:focus {
-  border: 1px solid var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary), 0 0 10px 0 rgba(0, 0, 0, 0.1);
-}
-
-.search-icon {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  left: 12px;
-  color: var(--color-text);
-  transition: all 0.2s ease;
-}
-
-.search-wrapper:focus-within .search-icon {
-  color: var(--color-primary);
-}
-
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -124,6 +85,29 @@ body {
   border-radius: 50%;
   background: var(--color-primary);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar svg {
+  color: #ffffff;
+}
+
+.avatar svg path,
+.avatar svg circle,
+.avatar svg line,
+.avatar svg polyline,
+.avatar svg rect {
+  stroke: #ffffff;
 }
 
 .profile-button {
@@ -140,6 +124,27 @@ body {
 
 .profile-name {
   font-weight: 600;
+}
+
+.profile-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.profile-text.center {
+  align-items: center;
+}
+
+.profile-name-top {
+  font-size: 12px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.profile-title-top {
+  font-size: 11px;
+  color: #6b7280;
 }
 
 .sidebar {

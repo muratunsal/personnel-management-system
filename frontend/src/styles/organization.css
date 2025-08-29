@@ -1,3 +1,8 @@
+.org-container {
+  width: 100%;
+  height: 100%;
+}
+
 .org-chart-container {
   width: 100%;
   height: 100%;
@@ -197,6 +202,7 @@
   flex-shrink: 0;
   border: 3px solid rgba(255, 255, 255, 0.3);
   transition: all 0.3s ease;
+  overflow: hidden;
 }
 
 .org-chart-head-card .org-chart-person-avatar,
@@ -204,6 +210,8 @@
   width: 52px;
   height: 52px;
   font-size: 16px;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .org-chart-head-card:hover .org-chart-person-avatar,
@@ -337,4 +345,50 @@
 .org-chart-reset-btn:active {
   transform: translateY(0) scale(0.95);
   box-shadow: 0 4px 12px rgba(2, 6, 23, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.org-chart-placeholder-head {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-color: #d1d5db;
+}
+
+.org-chart-placeholder-avatar {
+  background-color: #f3f4f6 !important;
+  color: #9ca3af !important;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.org-chart-placeholder-text {
+  color: #9ca3af !important;
+}
+
+.org-chart-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50% !important;
+}
+
+.org-chart-person-avatar img,
+.org-chart-person-avatar svg {
+  border-radius: 50% !important;
+}
+
+.org-chart-person-avatar,
+.org-chart-person-avatar * {
+  border-radius: 50% !important;
+  overflow: hidden;
+}
+
+.org-chart-person-avatar.has-image {
+  background-color: transparent;
+  overflow: hidden;
+}
+
+.org-chart-person-avatar.no-image {
+  background-color: var(--avatar-color);
+  color: #ffffff;
+  overflow: hidden;
 }

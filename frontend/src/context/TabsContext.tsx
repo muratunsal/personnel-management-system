@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-export type TabKey = 'Dashboard' | 'People' | 'Organization' | 'Messages' | 'Calendar' | 'Settings';
+export type TabKey = 'Dashboard' | 'People' | 'Organization';
 
 type TabsContextValue = {
   activeTab: TabKey;
