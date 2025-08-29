@@ -4,8 +4,13 @@ import com.example.personnelservice.model.Department;
 import com.example.personnelservice.model.Person;
 import com.example.personnelservice.model.Task;
 import com.example.personnelservice.repository.*;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.personnelservice.config.RabbitMQConfig;
+import com.example.personnelservice.event.TaskAssignmentEvent;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,13 +20,16 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final PersonRepository personRepository;
     private final DepartmentRepository departmentRepository;
+    private final RabbitTemplate rabbitTemplate;
 
     public TaskService(TaskRepository taskRepository,
                        PersonRepository personRepository,
-                       DepartmentRepository departmentRepository) {
+                       DepartmentRepository departmentRepository,
+                       RabbitTemplate rabbitTemplate) {
         this.taskRepository = taskRepository;
         this.personRepository = personRepository;
         this.departmentRepository = departmentRepository;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public Person getCurrentUser(String email) {
@@ -50,7 +58,17 @@ public class TaskService {
             Person assignee = personRepository.findById(assigneeId).orElseThrow();
             task.setAssignee(assignee);
         }
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+        
+        if (savedTask.getAssignee() != null) {
+            try {
+                sendTaskAssignmentEvent(savedTask);
+            } catch (Exception e) {
+                
+            }
+        }
+        
+        return savedTask;
     }
 
     public List<Task> getTasksForAssignee(String email) {
@@ -103,6 +121,32 @@ public class TaskService {
 
     public List<Task> listAll() {
         return taskRepository.findAll();
+    }
+
+    private void sendTaskAssignmentEvent(Task task) {
+        TaskAssignmentEvent event = new TaskAssignmentEvent();
+        event.setTaskId(task.getId());
+        event.setTaskTitle(task.getTitle());
+        event.setTaskDescription(task.getDescription());
+        event.setPriority(task.getPriority().name());
+        event.setAssigneeId(task.getAssignee().getId());
+        event.setAssigneeEmail(task.getAssignee().getEmail());
+        event.setAssigneeName(task.getAssignee().getFirstName() + " " + task.getAssignee().getLastName());
+        Person creator = task.getCreatedBy();
+        if (creator != null) {
+            event.setAssignedBy(creator.getId());
+            event.setAssignedByEmail(creator.getEmail());
+            event.setAssignedByName(creator.getFirstName() + " " + creator.getLastName());
+        } else {
+            event.setAssignedBy(null);
+            event.setAssignedByEmail(null);
+            event.setAssignedByName("Admin");
+        }
+        event.setDepartmentName(task.getDepartment() != null ? task.getDepartment().getName() : "General");
+        event.setAssignedAt(task.getCreatedAt());
+        
+        rabbitTemplate.convertAndSend(RabbitMQConfig.TASK_ASSIGNMENT_EXCHANGE,
+                RabbitMQConfig.TASK_ASSIGNMENT_ROUTING_KEY, event);
     }
 }
 

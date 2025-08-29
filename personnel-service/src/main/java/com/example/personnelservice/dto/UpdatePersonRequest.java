@@ -2,7 +2,6 @@ package com.example.personnelservice.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import java.time.LocalDate;
 
 public class UpdatePersonRequest {
     
@@ -19,18 +18,18 @@ public class UpdatePersonRequest {
     private String phoneNumber;
     private Long departmentId;
     private Long titleId;
-    private LocalDate contractStartDate;
-    private LocalDate birthDate;
+    private String contractStartDate;
+    private String birthDate;
     private String gender;
     private String address;
     private String profilePictureUrl;
     
-    private Integer salary;
+    private String salary;
     private String nationalId;
     private String bankAccount;
     private String insuranceNumber;
     private String contractType;
-    private LocalDate contractEndDate;
+    private String contractEndDate;
 
     public String getFirstName() {
         return firstName;
@@ -80,19 +79,19 @@ public class UpdatePersonRequest {
         this.titleId = titleId;
     }
 
-    public LocalDate getContractStartDate() {
+    public String getContractStartDate() {
         return contractStartDate;
     }
 
-    public void setContractStartDate(LocalDate contractStartDate) {
+    public void setContractStartDate(String contractStartDate) {
         this.contractStartDate = contractStartDate;
     }
 
-    public LocalDate getBirthDate() {
+    public String getBirthDate() {
         return birthDate;
     }
 
-    public void setBirthDate(LocalDate birthDate) {
+    public void setBirthDate(String birthDate) {
         this.birthDate = birthDate;
     }
 
@@ -120,11 +119,11 @@ public class UpdatePersonRequest {
         this.profilePictureUrl = profilePictureUrl;
     }
 
-    public Integer getSalary() {
+    public String getSalary() {
         return salary;
     }
 
-    public void setSalary(Integer salary) {
+    public void setSalary(String salary) {
         this.salary = salary;
     }
 
@@ -160,11 +159,11 @@ public class UpdatePersonRequest {
         this.contractType = contractType;
     }
 
-    public LocalDate getContractEndDate() {
+    public String getContractEndDate() {
         return contractEndDate;
     }
 
-    public void setContractEndDate(LocalDate contractEndDate) {
+    public void setContractEndDate(String contractEndDate) {
         this.contractEndDate = contractEndDate;
     }
 

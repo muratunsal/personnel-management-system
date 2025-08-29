@@ -162,6 +162,15 @@ public class DepartmentController {
         return ResponseEntity.ok(saved);
     }
 
+    @PostMapping("/{departmentId}/clear-head")
+    public ResponseEntity<Department> clearHead(@PathVariable Long departmentId) {
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new RuntimeException("Department not found"));
+        department.setHeadOfDepartment(null);
+        Department saved = departmentRepository.save(department);
+        return ResponseEntity.ok(saved);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteDepartment(@PathVariable Long id) {
         try {

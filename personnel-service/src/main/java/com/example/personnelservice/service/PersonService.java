@@ -5,19 +5,29 @@ import com.example.personnelservice.dto.UpdatePersonRequest;
 import com.example.personnelservice.model.Department;
 import com.example.personnelservice.model.Person;
 import com.example.personnelservice.model.Title;
+import com.example.personnelservice.model.Meeting;
+import com.example.personnelservice.model.Task;
 import com.example.personnelservice.repository.DepartmentRepository;
 import com.example.personnelservice.repository.PersonRepository;
 import com.example.personnelservice.repository.TitleRepository;
+import com.example.personnelservice.repository.MeetingRepository;
+import com.example.personnelservice.repository.TaskRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.personnelservice.config.RabbitMQConfig;
+import com.example.personnelservice.event.PersonUpdateEvent;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import jakarta.persistence.criteria.Predicate;
 
@@ -28,37 +38,73 @@ public class PersonService {
     private final PersonRepository personRepository;
     private final DepartmentRepository departmentRepository;
     private final TitleRepository titleRepository;
-
+    private final MeetingRepository meetingRepository;
+    private final TaskRepository taskRepository;
     private final com.example.personnelservice.service.AuthService authService;
+    private final RabbitTemplate rabbitTemplate;
 
     public PersonService(PersonRepository personRepository, 
                         DepartmentRepository departmentRepository, 
                         TitleRepository titleRepository,
-                        com.example.personnelservice.service.AuthService authService) {
+                        MeetingRepository meetingRepository,
+                        TaskRepository taskRepository,
+                        com.example.personnelservice.service.AuthService authService,
+                        RabbitTemplate rabbitTemplate) {
         this.personRepository = personRepository;
         this.departmentRepository = departmentRepository;
         this.titleRepository = titleRepository;
+        this.meetingRepository = meetingRepository;
+        this.taskRepository = taskRepository;
         this.authService = authService;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public Person createPerson(CreatePersonRequest request) {
         Person person = new Person();
-        person.setFirstName(request.getFirstName());
-        person.setLastName(request.getLastName());
+        if (request.getFirstName() != null) person.setFirstName(request.getFirstName());
+        if (request.getLastName() != null) person.setLastName(request.getLastName());
         person.setEmail(request.getEmail());
         person.setPhoneNumber(request.getPhoneNumber());
-        person.setContractStartDate(request.getContractStartDate());
-        person.setBirthDate(request.getBirthDate());
+        if (request.getContractStartDate() != null && !request.getContractStartDate().trim().isEmpty()) {
+            try {
+                person.setContractStartDate(LocalDate.parse(request.getContractStartDate()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid contract start date format: " + request.getContractStartDate());
+            }
+        }
+        
+        if (request.getBirthDate() != null && !request.getBirthDate().trim().isEmpty()) {
+            try {
+                person.setBirthDate(LocalDate.parse(request.getBirthDate()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid birth date format: " + request.getBirthDate());
+            }
+        }
+        
         person.setGender(request.getGender());
         person.setAddress(request.getAddress());
         person.setProfilePictureUrl(request.getProfilePictureUrl());
         
-        person.setSalary(request.getSalary());
+        if (request.getSalary() != null && !request.getSalary().trim().isEmpty()) {
+            try {
+                person.setSalary(Integer.parseInt(request.getSalary()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid salary format: " + request.getSalary());
+            }
+        }
+        
         person.setNationalId(request.getNationalId());
         person.setBankAccount(request.getBankAccount());
         person.setInsuranceNumber(request.getInsuranceNumber());
         person.setContractType(request.getContractType());
-        person.setContractEndDate(request.getContractEndDate());
+        
+        if (request.getContractEndDate() != null && !request.getContractEndDate().trim().isEmpty()) {
+            try {
+                person.setContractEndDate(LocalDate.parse(request.getContractEndDate()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid contract end date format: " + request.getContractEndDate());
+            }
+        }
 
         Department targetDepartment = null;
         if (request.getDepartmentId() != null) {
@@ -174,25 +220,65 @@ public class PersonService {
         Person person = personRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Person not found with ID: " + id));
 
+        
+        Map<String, Object> changes = detectChanges(person, request);
+
         person.setFirstName(request.getFirstName());
         person.setLastName(request.getLastName());
         Long oldDepartmentId = person.getDepartment() != null ? person.getDepartment().getId() : null;
         Long oldTitleId = person.getTitle() != null ? person.getTitle().getId() : null;
         String oldEmail = person.getEmail();
-        person.setEmail(request.getEmail());
-        person.setPhoneNumber(request.getPhoneNumber());
-        person.setContractStartDate(request.getContractStartDate());
-        person.setBirthDate(request.getBirthDate());
-        person.setGender(request.getGender());
-        person.setAddress(request.getAddress());
-        person.setProfilePictureUrl(request.getProfilePictureUrl());
+        if (request.getEmail() != null) person.setEmail(request.getEmail());
+        if (request.getPhoneNumber() != null) person.setPhoneNumber(request.getPhoneNumber());
         
-        person.setSalary(request.getSalary() != null ? request.getSalary() : person.getSalary());
-        person.setNationalId(request.getNationalId());
-        person.setBankAccount(request.getBankAccount());
-        person.setInsuranceNumber(request.getInsuranceNumber());
-        person.setContractType(request.getContractType());
-        person.setContractEndDate(request.getContractEndDate());
+        if (request.getContractStartDate() != null && !request.getContractStartDate().trim().isEmpty()) {
+            try {
+                person.setContractStartDate(LocalDate.parse(request.getContractStartDate()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid contract start date format: " + request.getContractStartDate());
+            }
+        } else {
+            person.setContractStartDate(null);
+        }
+        
+        if (request.getBirthDate() != null && !request.getBirthDate().trim().isEmpty()) {
+            try {
+                person.setBirthDate(LocalDate.parse(request.getBirthDate()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid birth date format: " + request.getBirthDate());
+            }
+        } else {
+            person.setBirthDate(null);
+        }
+        
+        if (request.getGender() != null) person.setGender(request.getGender());
+        if (request.getAddress() != null) person.setAddress(request.getAddress());
+        if (request.getProfilePictureUrl() != null) person.setProfilePictureUrl(request.getProfilePictureUrl());
+        
+        if (request.getSalary() != null && !request.getSalary().trim().isEmpty()) {
+            try {
+                person.setSalary(Integer.parseInt(request.getSalary()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid salary format: " + request.getSalary());
+            }
+        } else {
+            person.setSalary(null);
+        }
+        
+        if (request.getNationalId() != null) person.setNationalId(request.getNationalId());
+        if (request.getBankAccount() != null) person.setBankAccount(request.getBankAccount());
+        if (request.getInsuranceNumber() != null) person.setInsuranceNumber(request.getInsuranceNumber());
+        if (request.getContractType() != null) person.setContractType(request.getContractType());
+        
+        if (request.getContractEndDate() != null && !request.getContractEndDate().trim().isEmpty()) {
+            try {
+                person.setContractEndDate(LocalDate.parse(request.getContractEndDate()));
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid contract end date format: " + request.getContractEndDate());
+            }
+        } else {
+            person.setContractEndDate(null);
+        }
 
         Department targetDepartment = null;
         if (request.getDepartmentId() != null && request.getDepartmentId() > 0) {
@@ -223,6 +309,12 @@ public class PersonService {
         }
 
         Person savedPerson = personRepository.save(person);
+
+        if (!changes.isEmpty()) {
+            sendPersonUpdateEvents(changes, savedPerson);
+        } else {
+            
+        }
 
         boolean deptChanged = (oldDepartmentId == null ? person.getDepartment() != null : (person.getDepartment() == null || !oldDepartmentId.equals(person.getDepartment().getId())));
         boolean titleChanged = (oldTitleId == null ? person.getTitle() != null : (person.getTitle() == null || !oldTitleId.equals(person.getTitle().getId())));
@@ -283,6 +375,247 @@ public class PersonService {
         return savedPerson;
     }
 
+    private Map<String, Object> detectChanges(Person person, UpdatePersonRequest request) {
+        Map<String, Object> changes = new HashMap<>();
+        
+        if (request.getFirstName() != null && !request.getFirstName().equals(person.getFirstName())) {
+            changes.put("firstName", Map.of("old", person.getFirstName(), "new", request.getFirstName()));
+        }
+        if (request.getLastName() != null && !request.getLastName().equals(person.getLastName())) {
+            changes.put("lastName", Map.of("old", person.getLastName(), "new", request.getLastName()));
+        }
+        if (request.getEmail() != null && !request.getEmail().equals(person.getEmail())) {
+            changes.put("email", Map.of("old", person.getEmail(), "new", request.getEmail()));
+        }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().equals(person.getPhoneNumber())) {
+            changes.put("phoneNumber", Map.of("old", person.getPhoneNumber(), "new", request.getPhoneNumber()));
+        }
+        if (request.getSalary() != null) {
+            if (request.getSalary().trim().isEmpty()) {
+                if (person.getSalary() != null) {
+                    Map<String, Object> salaryChange = new HashMap<>();
+                    salaryChange.put("old", person.getSalary());
+                    salaryChange.put("new", null);
+                    changes.put("salary", salaryChange);
+                }
+            } else {
+                try {
+                    Integer newSalary = Integer.parseInt(request.getSalary());
+                    if (!newSalary.equals(person.getSalary())) {
+                        Map<String, Object> salaryChange = new HashMap<>();
+                        salaryChange.put("old", person.getSalary());
+                        salaryChange.put("new", newSalary);
+                        changes.put("salary", salaryChange);
+                    }
+                } catch (Exception e) {
+                    
+                }
+            }
+        }
+        if (request.getAddress() != null && !request.getAddress().equals(person.getAddress())) {
+            changes.put("address", Map.of("old", person.getAddress(), "new", request.getAddress()));
+        }
+        if (request.getProfilePictureUrl() != null && !request.getProfilePictureUrl().equals(person.getProfilePictureUrl())) {
+            changes.put("profilePictureUrl", Map.of("old", person.getProfilePictureUrl(), "new", request.getProfilePictureUrl()));
+        }
+        if (request.getGender() != null && !request.getGender().equals(person.getGender())) {
+            changes.put("gender", Map.of("old", person.getGender(), "new", request.getGender()));
+        }
+        if (request.getBirthDate() != null) {
+            if (request.getBirthDate().trim().isEmpty()) {
+                if (person.getBirthDate() != null) {
+                    Map<String, Object> birthDateChange = new HashMap<>();
+                    birthDateChange.put("old", person.getBirthDate());
+                    birthDateChange.put("new", null);
+                    changes.put("birthDate", birthDateChange);
+                }
+            } else {
+                try {
+                    LocalDate newBirthDate = LocalDate.parse(request.getBirthDate());
+                    if (!newBirthDate.equals(person.getBirthDate())) {
+                        Map<String, Object> birthDateChange = new HashMap<>();
+                        birthDateChange.put("old", person.getBirthDate());
+                        birthDateChange.put("new", newBirthDate);
+                        changes.put("birthDate", birthDateChange);
+                    }
+                } catch (Exception e) {
+                    
+                }
+            }
+        }
+        if (request.getContractStartDate() != null) {
+            if (request.getContractStartDate().trim().isEmpty()) {
+                if (person.getContractStartDate() != null) {
+                    Map<String, Object> contractStartDateChange = new HashMap<>();
+                    contractStartDateChange.put("old", person.getContractStartDate());
+                    contractStartDateChange.put("new", null);
+                    changes.put("contractStartDate", contractStartDateChange);
+                }
+            } else {
+                try {
+                    LocalDate newContractStartDate = LocalDate.parse(request.getContractStartDate());
+                    if (!newContractStartDate.equals(person.getContractStartDate())) {
+                        Map<String, Object> contractStartDateChange = new HashMap<>();
+                        contractStartDateChange.put("old", person.getContractStartDate());
+                        contractStartDateChange.put("new", newContractStartDate);
+                        changes.put("contractStartDate", contractStartDateChange);
+                    }
+                } catch (Exception e) {
+                    
+                }
+            }
+        }
+        if (request.getContractEndDate() != null) {
+            if (request.getContractEndDate().trim().isEmpty()) {
+                if (person.getContractEndDate() != null) {
+                    Map<String, Object> contractEndDateChange = new HashMap<>();
+                    contractEndDateChange.put("old", person.getContractEndDate());
+                    contractEndDateChange.put("new", null);
+                    changes.put("contractEndDate", contractEndDateChange);
+                }
+            } else {
+                try {
+                    LocalDate newContractEndDate = LocalDate.parse(request.getContractEndDate());
+                    if (!newContractEndDate.equals(person.getContractEndDate())) {
+                        Map<String, Object> contractEndDateChange = new HashMap<>();
+                        contractEndDateChange.put("old", person.getContractEndDate());
+                        contractEndDateChange.put("new", newContractEndDate);
+                        changes.put("contractEndDate", contractEndDateChange);
+                    }
+                } catch (Exception e) {
+                    
+                }
+            }
+        }
+        if (request.getContractType() != null && !request.getContractType().equals(person.getContractType())) {
+            changes.put("contractType", Map.of("old", person.getContractType(), "new", request.getContractType()));
+        }
+        if (request.getNationalId() != null && !request.getNationalId().equals(person.getNationalId())) {
+            changes.put("nationalId", Map.of("old", person.getNationalId(), "new", request.getNationalId()));
+        }
+        if (request.getBankAccount() != null && !request.getBankAccount().equals(person.getBankAccount())) {
+            changes.put("bankAccount", Map.of("old", person.getBankAccount(), "new", request.getBankAccount()));
+        }
+        if (request.getInsuranceNumber() != null && !request.getInsuranceNumber().equals(person.getInsuranceNumber())) {
+            changes.put("insuranceNumber", Map.of("old", person.getInsuranceNumber(), "new", request.getInsuranceNumber()));
+        }
+        if ((request.getDepartmentId() != null && (person.getDepartment() == null || !request.getDepartmentId().equals(person.getDepartment().getId())))
+            || (request.getDepartmentId() == null && person.getDepartment() != null)) {
+            String oldDept = person.getDepartment() != null ? person.getDepartment().getName() : null;
+            String newDept = null;
+            if (request.getDepartmentId() != null && request.getDepartmentId() > 0) {
+                Department d = departmentRepository.findById(request.getDepartmentId()).orElse(null);
+                newDept = d != null ? d.getName() : null;
+            }
+            changes.put("departmentId", Map.of("old", oldDept, "new", newDept));
+        }
+        if ((request.getTitleId() != null && (person.getTitle() == null || !request.getTitleId().equals(person.getTitle().getId())))
+            || (request.getTitleId() == null && person.getTitle() != null)) {
+            String oldTitle = person.getTitle() != null ? person.getTitle().getName() : null;
+            String newTitle = null;
+            if (request.getTitleId() != null && request.getTitleId() > 0) {
+                Title t = titleRepository.findById(request.getTitleId()).orElse(null);
+                newTitle = t != null ? t.getName() : null;
+            }
+            changes.put("titleId", Map.of("old", oldTitle, "new", newTitle));
+        }
+        
+        return changes;
+    }
+
+    private void sendPersonUpdateEvents(Map<String, Object> changes, Person person) {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String actorEmail = null;
+        String actorName = null;
+        Long actorId = null;
+        boolean isAdmin = false;
+        if (auth != null) {
+            Object principal = auth.getPrincipal();
+            if (principal != null) {
+                actorEmail = principal.toString();
+            }
+            if (auth.getAuthorities() != null) {
+                for (org.springframework.security.core.GrantedAuthority ga : auth.getAuthorities()) {
+                    if (ga != null && ga.getAuthority() != null && ga.getAuthority().equals("ROLE_ADMIN")) {
+                        isAdmin = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (isAdmin) {
+            actorName = "Admin";
+        } else if (actorEmail != null && !actorEmail.isBlank()) {
+            Person actor = personRepository.findByEmail(actorEmail);
+            if (actor != null) {
+                actorName = (actor.getFirstName() != null ? actor.getFirstName() : "") + " " + (actor.getLastName() != null ? actor.getLastName() : "");
+                actorId = actor.getId();
+            }
+        }
+        if (actorName == null || actorName.isBlank()) {
+            actorName = person.getFirstName() + " " + person.getLastName();
+        }
+        if (actorEmail == null || actorEmail.isBlank()) {
+            actorEmail = person.getEmail();
+        }
+        if (actorId == null) {
+            actorId = person.getId();
+        }
+
+        java.util.List<PersonUpdateEvent.ChangeDetail> changeList = new java.util.ArrayList<>();
+        java.util.List<String> orderedKeys = java.util.Arrays.asList(
+            "firstName",
+            "lastName",
+            "email",
+            "phoneNumber",
+            "nationalId",
+            "departmentId",
+            "titleId",
+            "contractType",
+            "salary",
+            "contractStartDate",
+            "contractEndDate",
+            "birthDate",
+            "gender",
+            "address",
+            "bankAccount",
+            "insuranceNumber",
+            "profilePictureUrl"
+        );
+        java.util.Set<String> added = new java.util.HashSet<>();
+        for (String key : orderedKeys) {
+            if (changes.containsKey(key)) {
+                Map<String, Object> fieldChange = (Map<String, Object>) changes.get(key);
+                String oldV = fieldChange.get("old") != null ? String.valueOf(fieldChange.get("old")) : null;
+                String newV = fieldChange.get("new") != null ? String.valueOf(fieldChange.get("new")) : null;
+                changeList.add(new PersonUpdateEvent.ChangeDetail(key, oldV, newV));
+                added.add(key);
+            }
+        }
+        for (Map.Entry<String, Object> entry : changes.entrySet()) {
+            if (added.contains(entry.getKey())) continue;
+            Map<String, Object> fieldChange = (Map<String, Object>) entry.getValue();
+            String k = entry.getKey();
+            String oldV = fieldChange.get("old") != null ? String.valueOf(fieldChange.get("old")) : null;
+            String newV = fieldChange.get("new") != null ? String.valueOf(fieldChange.get("new")) : null;
+            changeList.add(new PersonUpdateEvent.ChangeDetail(k, oldV, newV));
+        }
+
+        PersonUpdateEvent event = new PersonUpdateEvent();
+        event.setPersonId(person.getId());
+        event.setUpdatedBy(actorId);
+        event.setUpdatedAt(LocalDateTime.now());
+        event.setPersonEmail(person.getEmail());
+        event.setPersonName(person.getFirstName() + " " + person.getLastName());
+        event.setUpdatedByEmail(actorEmail);
+        event.setUpdatedByName(actorName);
+        event.setChanges(changeList);
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.PERSON_UPDATE_EXCHANGE, 
+                                      RabbitMQConfig.PERSON_UPDATE_ROUTING_KEY, event);
+        
+    }
+
     public void deletePerson(Long id) {
         Person person = personRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Person not found with ID: " + id));
@@ -290,11 +623,37 @@ public class PersonService {
         java.util.List<com.example.personnelservice.model.Department> departments = departmentRepository.findByHeadOfDepartmentId(id);
         for (com.example.personnelservice.model.Department dept : departments) {
             dept.setHeadOfDepartment(null);
+            departmentRepository.save(dept);
         }
 
         if (person.getDepartment() != null && person.getDepartment().getHeadOfDepartment() != null &&
                 person.getDepartment().getHeadOfDepartment().getId().equals(id)) {
             person.getDepartment().setHeadOfDepartment(null);
+            departmentRepository.save(person.getDepartment());
+        }
+
+        java.util.List<Meeting> meetingsAsOrganizer = meetingRepository.findByOrganizerOrderByDayAscStartTimeAsc(person);
+        for (Meeting meeting : meetingsAsOrganizer) {
+            meeting.setOrganizer(null);
+            meetingRepository.save(meeting);
+        }
+
+        java.util.List<Meeting> meetingsAsParticipant = meetingRepository.findByParticipantsContainsOrderByDayAscStartTimeAsc(person);
+        for (Meeting meeting : meetingsAsParticipant) {
+            meeting.getParticipants().remove(person);
+            meetingRepository.save(meeting);
+        }
+
+        java.util.List<Task> tasksAsAssignee = taskRepository.findByAssigneeOrderByCreatedAtDesc(person);
+        for (Task task : tasksAsAssignee) {
+            task.setAssignee(null);
+            taskRepository.save(task);
+        }
+
+        java.util.List<Task> tasksAsCreator = taskRepository.findByCreatedByOrderByCreatedAtDesc(person);
+        for (Task task : tasksAsCreator) {
+            task.setCreatedBy(null);
+            taskRepository.save(task);
         }
 
         personRepository.deleteById(id);

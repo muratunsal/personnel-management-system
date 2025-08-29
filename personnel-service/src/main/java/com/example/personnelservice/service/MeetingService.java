@@ -6,8 +6,11 @@ import com.example.personnelservice.model.Person;
 import com.example.personnelservice.repository.DepartmentRepository;
 import com.example.personnelservice.repository.MeetingRepository;
 import com.example.personnelservice.repository.PersonRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.personnelservice.config.RabbitMQConfig;
+import com.example.personnelservice.event.MeetingInvitationEvent;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,6 +18,7 @@ import java.time.LocalTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class MeetingService {
@@ -22,13 +26,16 @@ public class MeetingService {
     private final MeetingRepository meetingRepository;
     private final PersonRepository personRepository;
     private final DepartmentRepository departmentRepository;
+    private final RabbitTemplate rabbitTemplate;
 
     public MeetingService(MeetingRepository meetingRepository,
                           PersonRepository personRepository,
-                          DepartmentRepository departmentRepository) {
+                          DepartmentRepository departmentRepository,
+                          RabbitTemplate rabbitTemplate) {
         this.meetingRepository = meetingRepository;
         this.personRepository = personRepository;
         this.departmentRepository = departmentRepository;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public Meeting.ComputedStatus computeStatus(Meeting m, LocalDateTime now) {
@@ -83,7 +90,16 @@ public class MeetingService {
             }
         }
         m.setParticipants(participants);
-        return meetingRepository.save(m);
+        Meeting savedMeeting = meetingRepository.save(m);
+        
+        if (!participants.isEmpty()) {
+            try {
+                sendMeetingInvitationEvent(savedMeeting);
+            } catch (Exception ignored) {
+            }
+        }
+        
+        return savedMeeting;
     }
 
     public List<Meeting> listAll() { return meetingRepository.findAll(); }
@@ -111,6 +127,42 @@ public class MeetingService {
     public List<Meeting> listByDepartment(Long departmentId) {
         Department d = departmentRepository.findById(departmentId).orElseThrow();
         return meetingRepository.findByDepartmentOrderByDayAscStartTimeAsc(d);
+    }
+
+    private void sendMeetingInvitationEvent(Meeting meeting) {
+        MeetingInvitationEvent event = new MeetingInvitationEvent();
+        event.setMeetingId(meeting.getId());
+        event.setMeetingTitle(meeting.getTitle());
+        event.setMeetingDescription(meeting.getDescription());
+        Person organizer = meeting.getOrganizer();
+        if (organizer != null) {
+            event.setOrganizerId(organizer.getId());
+            event.setOrganizerEmail(organizer.getEmail());
+            event.setOrganizerName(organizer.getFirstName() + " " + organizer.getLastName());
+        } else {
+            event.setOrganizerId(null);
+            event.setOrganizerEmail(null);
+            event.setOrganizerName("Admin");
+        }
+        event.setDepartmentName(meeting.getDepartment() != null ? meeting.getDepartment().getName() : "General");
+        event.setMeetingDay(meeting.getDay());
+        event.setStartTime(meeting.getStartTime());
+        event.setEndTime(meeting.getEndTime());
+        event.setParticipantIds(meeting.getParticipants().stream().map(Person::getId).collect(Collectors.toSet()));
+        event.setParticipantEmails(meeting.getParticipants().stream().map(Person::getEmail).collect(Collectors.toSet()));
+        event.setParticipantNames(meeting.getParticipants().stream().map(p -> p.getFirstName() + " " + p.getLastName()).collect(Collectors.toSet()));
+        java.util.Map<String, String> emailToName = new java.util.HashMap<>();
+        for (Person p : meeting.getParticipants()) {
+            emailToName.put(p.getEmail(), p.getFirstName() + " " + p.getLastName());
+        }
+        if (organizer != null) {
+            emailToName.put(organizer.getEmail(), organizer.getFirstName() + " " + organizer.getLastName());
+        }
+        event.setParticipantEmailToName(emailToName);
+        event.setCreatedAt(meeting.getCreatedAt().toLocalDate());
+        
+        rabbitTemplate.convertAndSend(RabbitMQConfig.MEETING_INVITATION_EXCHANGE, 
+                                    RabbitMQConfig.MEETING_INVITATION_ROUTING_KEY, event);
     }
 }
 

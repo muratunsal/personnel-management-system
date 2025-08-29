@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Task Assignment</title>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #e67e22; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f8f9fa; }
+            .task-details { background: white; padding: 15px; margin: 15px 0; border-left: 4px solid #e67e22; }
+            .priority-high { color: #e74c3c; font-weight: bold; }
+            .priority-medium { color: #f39c12; font-weight: bold; }
+            .priority-low { color: #27ae60; font-weight: bold; }
+            .footer { text-align: center; padding: 20px; color: #7f8c8d; font-size: 12px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>New Task Assignment</h1>
+            </div>
+
+            <div class="content">
+                <p>Dear <strong th:text="${assigneeName}">Assignee
+                        Name</strong>,</p>
+
+                <p>A new task has been assigned to you. Task details are
+                    below:</p>
+
+                <div class="task-details">
+                    <h3 th:text="${taskTitle}">Task Title</h3>
+
+                    <p><strong>Task Description:</strong></p>
+                    <p th:text="${taskDescription}">Task Description</p>
+
+                    <p><strong>Priority:</strong>
+                        <span
+                            th:class="${priority == 'HIGH' ? 'priority-high' : (priority == 'MEDIUM' ? 'priority-medium' : 'priority-low')}"
+                            th:text="${priority}">Priority</span>
+                    </p>
+
+                    <p><strong>Department:</strong> <span
+                            th:text="${departmentName}">Department</span></p>
+                    <p><strong>Assigned By:</strong> <span
+                            th:text="${assignedByName}">Assigned By</span></p>
+                    <p><strong>Assignment Date:</strong> <span
+                            th:text="${assignedAt}">Assigned At</span></p>
+
+                </div>
+
+                <p>Please review the task and take necessary actions as soon as
+                    possible.</p>
+
+                <p>You can update the task status by logging into the
+                    system.</p>
+            </div>
+
+            <div class="footer">
+                <p>This email was sent automatically. Please do not reply.</p>
+            </div>
+        </div>
+    </body>
+</html>

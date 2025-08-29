@@ -8,8 +8,12 @@ import com.example.authservice.dto.UpdateUserRequest;
 import com.example.authservice.model.User;
 import com.example.authservice.model.UserRole;
 import com.example.authservice.repository.UserRepository;
+import com.example.authservice.event.UserProvisionedEvent;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.example.authservice.service.AuthService;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import static com.example.authservice.config.RabbitMQConfig.USER_PROVISIONED_EXCHANGE;
+import static com.example.authservice.config.RabbitMQConfig.USER_PROVISIONED_ROUTING_KEY;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +33,9 @@ public class AuthController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
@@ -76,6 +83,12 @@ public class AuthController {
         }
         u.setRoles(roles);
         userRepository.save(u);
+        UserProvisionedEvent event = new UserProvisionedEvent();
+        event.setEmail(request.getEmail());
+        event.setFullName(null);
+        event.setPassword(rawPassword);
+        rabbitTemplate.convertAndSend(USER_PROVISIONED_EXCHANGE, USER_PROVISIONED_ROUTING_KEY, event,
+                m -> { m.getMessageProperties().setHeader("__TypeId__", "com.example.authservice.event.UserProvisionedEvent"); return m; });
         return ResponseEntity.ok(new ProvisionResponse(request.getEmail(), rawPassword, true));
     }
 
