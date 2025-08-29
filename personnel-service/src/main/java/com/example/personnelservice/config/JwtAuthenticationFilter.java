@@ -31,12 +31,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 if (authService.validateToken(token)) {
                     String role = authService.extractRole(token);
+                    String email = authService.extractEmail(token);
                     java.util.List<org.springframework.security.core.GrantedAuthority> authorities = new ArrayList<>();
                     if (role != null && !role.isEmpty()) {
                         authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role));
                     }
                     UsernamePasswordAuthenticationToken authentication = 
-                        new UsernamePasswordAuthenticationToken("user", null, authorities);
+                        new UsernamePasswordAuthenticationToken(email != null ? email : "user", null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 } else {
                 }

@@ -4,13 +4,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 @Service
 public class AuthService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final WebClient webClient;
 
     @Value("${auth-service.url:http://localhost:8082}")
@@ -22,13 +21,10 @@ public class AuthService {
 
     public boolean validateToken(String token) {
         if (token == null || token.trim().isEmpty()) {
-            log.debug("Token is null or empty");
             return false;
         }
 
         try {
-            log.debug("Validating token with auth service: {}", authServiceUrl);
-            
             Boolean isValid = webClient.post()
                     .uri(authServiceUrl + "/auth/validate")
                     .header("Content-Type", "application/x-www-form-urlencoded")
@@ -37,17 +33,14 @@ public class AuthService {
                     .onStatus(status -> status.is2xxSuccessful(), response -> Mono.empty())
                     .bodyToMono(Object.class)
                     .map(response -> {
-                        log.debug("Token validation successful");
                         return true;
                     })
                     .onErrorReturn(false)
                     .block();
             
             boolean result = Boolean.TRUE.equals(isValid);
-            log.debug("Token validation result: {}", result);
             return result;
         } catch (Exception e) {
-            log.error("Error validating token: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -65,7 +58,23 @@ public class AuthService {
                 .block();
             return role;
         } catch (Exception e) {
-            log.error("Error extracting role: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    public String extractEmail(String token) {
+        try {
+            String email = webClient.post()
+                .uri(authServiceUrl + "/auth/validate")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .bodyValue("token=" + token)
+                .retrieve()
+                .bodyToMono(java.util.Map.class)
+                .map(map -> (String) map.get("email"))
+                .onErrorReturn("")
+                .block();
+            return email;
+        } catch (Exception e) {
             return null;
         }
     }
@@ -84,7 +93,25 @@ public class AuthService {
             Object pw = resp != null ? resp.get("password") : null;
             return pw != null ? pw.toString() : null;
         } catch (Exception e) {
-            log.error("Error provisioning user {}: {}", email, e.getMessage());
+            return null;
+        }
+    }
+
+    public String provisionWithPassword(String email, java.util.List<String> roles, String password) {
+        try {
+            java.util.Map<String, Object> req = new java.util.HashMap<>();
+            req.put("email", email);
+            req.put("roles", roles);
+            if (password != null && !password.isBlank()) req.put("password", password);
+            java.util.Map resp = webClient.post()
+                    .uri(authServiceUrl + "/auth/provision")
+                    .bodyValue(req)
+                    .retrieve()
+                    .bodyToMono(java.util.Map.class)
+                    .block();
+            Object pw = resp != null ? resp.get("password") : null;
+            return pw != null ? pw.toString() : null;
+        } catch (Exception e) {
             return null;
         }
     }
@@ -103,7 +130,6 @@ public class AuthService {
                     .block();
             return true;
         } catch (Exception e) {
-            log.error("Error updating user {}: {}", email, e.getMessage());
             return false;
         }
     }

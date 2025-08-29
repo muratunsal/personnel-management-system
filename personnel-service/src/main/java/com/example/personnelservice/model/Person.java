@@ -36,10 +36,10 @@ public class Person {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "title_id")
-    private TitleEntity title;
+    private Title title;
 
-    @Column(name = "start_date")
-    private LocalDate startDate;
+    @Column(name = "contract_start_date")
+    private LocalDate contractStartDate;
 
     @Column(name = "birth_date")
     private LocalDate birthDate;
@@ -50,6 +50,28 @@ public class Person {
 
     @Column(name = "profile_picture_url")
     private String profilePictureUrl;
+
+    
+
+    @Column(name = "salary")
+    private Integer salary;
+
+    @Column(name = "national_id")
+    private String nationalId;
+
+    @Column(name = "bank_account")
+    private String bankAccount;
+
+    @Column(name = "insurance_number")
+    private String insuranceNumber;
+
+    @Column(name = "contract_type")
+    private String contractType;
+
+    @Column(name = "contract_end_date")
+    private LocalDate contractEndDate;
+
+    
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -63,10 +85,10 @@ public class Person {
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public Department getDepartment() { return department; }
     public void setDepartment(Department department) { this.department = department; }
-    public TitleEntity getTitle() { return title; }
-    public void setTitle(TitleEntity title) { this.title = title; }
-    public LocalDate getStartDate() { return startDate; }
-    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+    public Title getTitle() { return title; }
+    public void setTitle(Title title) { this.title = title; }
+    public LocalDate getContractStartDate() { return contractStartDate; }
+    public void setContractStartDate(LocalDate contractStartDate) { this.contractStartDate = contractStartDate; }
     public LocalDate getBirthDate() { return birthDate; }
     public void setBirthDate(LocalDate birthDate) { this.birthDate = birthDate; }
     public String getGender() { return gender; }
@@ -75,4 +97,19 @@ public class Person {
     public void setAddress(String address) { this.address = address; }
     public String getProfilePictureUrl() { return profilePictureUrl; }
     public void setProfilePictureUrl(String profilePictureUrl) { this.profilePictureUrl = profilePictureUrl; }
+    
+
+    public Integer getSalary() { return salary; }
+    public void setSalary(Integer salary) { this.salary = salary; }
+    public String getNationalId() { return nationalId; }
+    public void setNationalId(String nationalId) { this.nationalId = nationalId; }
+    public String getBankAccount() { return bankAccount; }
+    public void setBankAccount(String bankAccount) { this.bankAccount = bankAccount; }
+    public String getInsuranceNumber() { return insuranceNumber; }
+    public void setInsuranceNumber(String insuranceNumber) { this.insuranceNumber = insuranceNumber; }
+    public String getContractType() { return contractType; }
+    public void setContractType(String contractType) { this.contractType = contractType; }
+    public LocalDate getContractEndDate() { return contractEndDate; }
+    public void setContractEndDate(LocalDate contractEndDate) { this.contractEndDate = contractEndDate; }
+    
 } 

@@ -1,13 +1,18 @@
 package com.example.personnelservice.controller;
 
+import com.example.personnelservice.dto.AssignHeadRequest;
+import com.example.personnelservice.dto.CreateDepartmentRequest;
+import com.example.personnelservice.dto.UpdateDepartmentRequest;
 import com.example.personnelservice.model.Department;
+import com.example.personnelservice.model.Person;
+import com.example.personnelservice.model.Title;
 import com.example.personnelservice.repository.DepartmentRepository;
 import com.example.personnelservice.repository.PersonRepository;
-import com.example.personnelservice.model.Person;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.example.personnelservice.repository.TitleRepository;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,10 +25,14 @@ import java.util.Map;
 public class DepartmentController {
     private final DepartmentRepository departmentRepository;
     private final PersonRepository personRepository;
+    private final TitleRepository titleRepository;
 
-    public DepartmentController(DepartmentRepository departmentRepository, PersonRepository personRepository) {
+    public DepartmentController(DepartmentRepository departmentRepository,
+                                PersonRepository personRepository,
+                                TitleRepository titleRepository) {
         this.departmentRepository = departmentRepository;
         this.personRepository = personRepository;
+        this.titleRepository = titleRepository;
     }
 
     @GetMapping
@@ -80,4 +89,123 @@ public class DepartmentController {
         result.put("departments", departmentStructure);
         return result;
     }
-} 
+
+    @PostMapping
+    public ResponseEntity<Department> createDepartment(@Valid @RequestBody CreateDepartmentRequest request) {
+        if (departmentRepository.existsByNameIgnoreCase(request.getName())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        String color = normalizeHex(request.getColor());
+        Department department = new Department();
+        department.setName(request.getName());
+        department.setColor(color);
+        Department saved = departmentRepository.save(department);
+
+        String headTitleName = "Head of " + saved.getName();
+        boolean existsGlobally = titleRepository.existsByNameIgnoreCase(headTitleName);
+        if (!existsGlobally) {
+            titleRepository.findByDepartmentIdAndNameIgnoreCase(saved.getId(), headTitleName)
+                    .orElseGet(() -> {
+                        Title t = new Title();
+                        t.setName(headTitleName);
+                        t.setDepartment(saved);
+                        return titleRepository.save(t);
+                    });
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Department> updateDepartment(@PathVariable Long id, @Valid @RequestBody UpdateDepartmentRequest request) {
+        Department department = departmentRepository.findById(id).orElse(null);
+        if (department == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (request.getName() != null) {
+            department.setName(request.getName());
+        }
+        if (request.getColor() != null) {
+            department.setColor(normalizeHex(request.getColor()));
+        }
+        Department saved = departmentRepository.save(department);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/{departmentId}/assign-head")
+    public ResponseEntity<Department> assignHead(@PathVariable Long departmentId,
+                                                 @Valid @RequestBody AssignHeadRequest request) {
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new RuntimeException("Department not found"));
+        Person person = personRepository.findById(request.getPersonId())
+                .orElseThrow(() -> new RuntimeException("Person not found"));
+
+        department.setHeadOfDepartment(person);
+
+        String headTitleName = "Head of " + department.getName();
+        if (titleRepository.existsByNameIgnoreCase(headTitleName)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        Title headTitle = titleRepository.findByDepartmentIdAndNameIgnoreCase(department.getId(), headTitleName)
+                .orElseGet(() -> {
+                    Title t = new Title();
+                    t.setName(headTitleName);
+                    t.setDepartment(department);
+                    return titleRepository.save(t);
+                });
+
+        person.setDepartment(department);
+        person.setTitle(headTitle);
+        personRepository.save(person);
+
+        Department saved = departmentRepository.save(department);
+        return ResponseEntity.ok(saved);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteDepartment(@PathVariable Long id) {
+        try {
+            Department department = departmentRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Department not found"));
+
+            department.setHeadOfDepartment(null);
+
+            List<Person> people = personRepository.findByDepartmentId(id);
+            for (Person p : people) {
+                p.setDepartment(null);
+                p.setTitle(null);
+                personRepository.save(p);
+            }
+
+            List<Title> titles = titleRepository.findByDepartmentId(id);
+            for (Title t : titles) {
+                titleRepository.delete(t);
+            }
+
+            departmentRepository.deleteById(id);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String normalizeHex(String input) {
+        if (input == null) {
+            return "#999999";
+        }
+        String s = input.trim();
+        if (!s.startsWith("#")) {
+            s = "#" + s;
+        }
+        if (s.matches("#[0-9a-fA-F]{6}")) {
+            return s.toUpperCase();
+        }
+        if (s.matches("#[0-9a-fA-F]{3}")) {
+            char r = s.charAt(1);
+            char g = s.charAt(2);
+            char b = s.charAt(3);
+            return ("#" + r + r + g + g + b + b).toUpperCase();
+        }
+        return "#999999";
+    }
+}

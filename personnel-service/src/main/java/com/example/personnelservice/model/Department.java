@@ -3,6 +3,8 @@ package com.example.personnelservice.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.List;
 
 @Entity
 @Table(name = "departments")
@@ -24,6 +26,16 @@ public class Department {
     @JsonIgnoreProperties({"department"})
     private Person headOfDepartment;
 
+    @OneToMany(mappedBy = "department", fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"department"})
+    @JsonIgnore
+    private List<Title> titles;
+
+    @OneToMany(mappedBy = "department", fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"department", "title"})
+    @JsonIgnore
+    private List<Person> employees;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -35,4 +47,10 @@ public class Department {
 
     public Person getHeadOfDepartment() { return headOfDepartment; }
     public void setHeadOfDepartment(Person headOfDepartment) { this.headOfDepartment = headOfDepartment; }
+
+    public List<Title> getTitles() { return titles; }
+    public void setTitles(List<Title> titles) { this.titles = titles; }
+
+    public List<Person> getEmployees() { return employees; }
+    public void setEmployees(List<Person> employees) { this.employees = employees; }
 } 
