@@ -6,6 +6,8 @@ import com.example.notificationservice.event.TaskAssignmentEvent;
 import com.example.notificationservice.event.UserProvisionedEvent;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -15,12 +17,14 @@ import java.util.ArrayList;
 public class NotificationService {
 
     private final MailService mailService;
+    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
     public NotificationService(MailService mailService) {
         this.mailService = mailService;
     }
 
     public void handlePersonUpdate(PersonUpdateEvent event) {
+        log.info("Sending person update email to {}", event.getPersonEmail());
         Context context = new Context();
         context.setVariable("personName", event.getPersonName());
         java.util.List<java.util.Map<String, String>> prettyChanges = new java.util.ArrayList<>();
@@ -39,7 +43,7 @@ public class NotificationService {
 
         String subject = "Profile Update Notification";
         mailService.sendHtmlMail(event.getPersonEmail(), subject, "person-update", context);
-        
+        log.debug("Person update email sent to {}", event.getPersonEmail());
     }
 
     private String toPrettyFieldName(String key) {
@@ -88,6 +92,7 @@ public class NotificationService {
     }
 
     public void handleTaskAssignment(TaskAssignmentEvent event) {
+        log.info("Sending task assignment email to {}", event.getAssigneeEmail());
         Context context = new Context();
         context.setVariable("assigneeName", event.getAssigneeName());
         context.setVariable("taskTitle", event.getTaskTitle());
@@ -100,10 +105,11 @@ public class NotificationService {
 
         String subject = "New Task Assignment: " + event.getTaskTitle();
         mailService.sendHtmlMail(event.getAssigneeEmail(), subject, "task-assignment", context);
-        
+        log.debug("Task assignment email sent to {}", event.getAssigneeEmail());
     }
 
     public void handleMeetingInvitation(MeetingInvitationEvent event) {
+        log.info("Sending meeting invitation emails for {}", event.getMeetingTitle());
         Context context = new Context();
         context.setVariable("meetingTitle", event.getMeetingTitle());
         context.setVariable("meetingDescription", event.getMeetingDescription());
@@ -136,16 +142,17 @@ public class NotificationService {
             mailService.sendHtmlMail(to, subject, "meeting-invitation", personal);
             sentCount++;
         }
-        
+        log.debug("Meeting invitation emails sent count {}", sentCount);
     }
 
     public void handleUserProvisioned(UserProvisionedEvent event) {
+        log.info("Sending user provisioned email to {}", event.getEmail());
         Context context = new Context();
         String recipientName = (event.getFullName() == null || event.getFullName().isBlank()) ? "User" : event.getFullName();
         context.setVariable("recipientName", recipientName);
         context.setVariable("password", event.getPassword());
         String subject = "Your Account Has Been Created";
         mailService.sendHtmlMail(event.getEmail(), subject, "user-provisioned", context);
-        
+        log.debug("User provisioned email sent to {}", event.getEmail());
     }
 }

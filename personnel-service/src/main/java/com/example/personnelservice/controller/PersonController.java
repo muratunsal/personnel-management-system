@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/people")
@@ -21,6 +23,7 @@ import java.time.LocalDate;
 public class PersonController {
 
     private final PersonService personService;
+    private static final Logger log = LoggerFactory.getLogger(PersonController.class);
 
     public PersonController(PersonService personService) {
         this.personService = personService;
@@ -29,9 +32,12 @@ public class PersonController {
     @PostMapping
     public ResponseEntity<Person> createPerson(@Valid @RequestBody CreatePersonRequest request) {
         try {
+            log.info("Create person request for {}", request.getEmail());
             Person createdPerson = personService.createPerson(request);
+            log.info("Person created with id {}", createdPerson.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(createdPerson);
         } catch (RuntimeException e) {
+            log.warn("Create person failed: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
@@ -57,6 +63,7 @@ public class PersonController {
             @RequestParam(value = "birthDateTo", required = false) String birthDateToStr) {
         
         try {
+            log.info("List people page {} size {} sort {} {}", page, size, sortBy, direction);
             Sort sort = Sort.by(Sort.Direction.fromString(direction.toUpperCase()), sortBy);
             Pageable pageable = PageRequest.of(page, size, sort);
             
@@ -70,14 +77,17 @@ public class PersonController {
                 contractStartDateFrom, contractStartDateTo, birthDateFrom, birthDateTo, pageable
             );
             
+            log.info("People fetched count {}", people.getNumberOfElements());
             return ResponseEntity.ok(people);
         } catch (Exception e) {
+            log.warn("List people failed: {}", e.getMessage());
             return ResponseEntity.badRequest().body("Error retrieving people: " + e.getMessage());
         }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Person> getPersonById(@PathVariable Long id) {
+        log.info("Get person by id {}", id);
         return personService.findById(id)
                 .map(person -> ResponseEntity.ok(person))
                 .orElse(ResponseEntity.notFound().build());
@@ -85,20 +95,25 @@ public class PersonController {
 
     @GetMapping("/test")
     public ResponseEntity<String> test() {
+        log.info("Test endpoint called");
         return ResponseEntity.ok("Personnel service is working!");
     }
 
     @GetMapping("/test-auth")
     public ResponseEntity<String> testAuth() {
+        log.info("Test-auth endpoint called");
         return ResponseEntity.ok("Authentication is working!");
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updatePerson(@PathVariable Long id, @Valid @RequestBody UpdatePersonRequest request) {
         try {
+            log.info("Update person {}", id);
             Person updatedPerson = personService.updatePerson(id, request);
+            log.info("Person updated {}", updatedPerson.getId());
             return ResponseEntity.ok(updatedPerson);
         } catch (RuntimeException e) {
+            log.warn("Update person failed {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().body("Failed to update person: " + e.getMessage());
         }
     }
@@ -108,9 +123,12 @@ public class PersonController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deletePerson(@PathVariable Long id) {
         try {
+            log.info("Delete person {}", id);
             personService.deletePerson(id);
+            log.info("Person deleted {}", id);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
+            log.warn("Delete person failed {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().body("Failed to delete person: " + e.getMessage());
         }
     }

@@ -3,6 +3,8 @@ package com.example.authservice.service;
 import com.example.authservice.model.User;
 import com.example.authservice.model.UserRole;
 import com.example.authservice.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,8 @@ import java.util.Optional;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -22,20 +26,29 @@ public class AuthService {
     private JwtService jwtService;
 
     public Optional<String> login(String email, String password) {
+        log.info("Login attempt {}", email);
         Optional<User> user = userRepository.findByEmail(email);
         
         if (user.isPresent() && passwordEncoder.matches(password, user.get().getPassword())) {
             user.get().setLastLoginAt(LocalDateTime.now());
             userRepository.save(user.get());
             UserRole primary = choosePrimaryRole(user.get().getRoles());
+            log.info("Login granted {} as {}", email, primary.name());
             return Optional.of(jwtService.generateToken(email, primary, user.get().getRoles()));
         }
         
+        log.warn("Login denied {}", email);
         return Optional.empty();
     }
 
     public boolean validateToken(String token) {
-        return jwtService.validateToken(token);
+        boolean valid = jwtService.validateToken(token);
+        if (valid) {
+            log.debug("Token is valid");
+        } else {
+            log.warn("Token is invalid");
+        }
+        return valid;
     }
 
     public String getEmailFromToken(String token) {

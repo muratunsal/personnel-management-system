@@ -18,6 +18,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.example.personnelservice.config.RabbitMQConfig;
 import com.example.personnelservice.event.PersonUpdateEvent;
@@ -35,6 +37,7 @@ import jakarta.persistence.criteria.Predicate;
 @Transactional
 public class PersonService {
 
+    private static final Logger log = LoggerFactory.getLogger(PersonService.class);
     private final PersonRepository personRepository;
     private final DepartmentRepository departmentRepository;
     private final TitleRepository titleRepository;
@@ -60,6 +63,7 @@ public class PersonService {
     }
 
     public Person createPerson(CreatePersonRequest request) {
+        log.info("Creating person {}", request.getEmail());
         Person person = new Person();
         if (request.getFirstName() != null) person.setFirstName(request.getFirstName());
         if (request.getLastName() != null) person.setLastName(request.getLastName());
@@ -130,6 +134,7 @@ public class PersonService {
         }
 
         Person saved = personRepository.save(person);
+        log.info("Person persisted {}", saved.getId());
 
         if (targetDepartment != null && targetTitle != null) {
             java.util.List<String> roles = new java.util.ArrayList<>();
@@ -138,6 +143,7 @@ public class PersonService {
             if (isHr) roles.add("HR");
             if (isHead) roles.add("HEAD");
             if (roles.isEmpty()) roles.add("EMPLOYEE");
+            log.info("Provisioning user {} with roles {}", saved.getEmail(), roles);
             authService.provision(saved.getEmail(), roles);
         }
 
@@ -146,6 +152,7 @@ public class PersonService {
             if (expectedHeadTitle.equalsIgnoreCase(targetTitle.getName())) {
                 targetDepartment.setHeadOfDepartment(saved);
                 departmentRepository.save(targetDepartment);
+                log.info("Department head set {} -> {}", targetDepartment.getId(), saved.getId());
             }
         }
 
@@ -158,6 +165,7 @@ public class PersonService {
             LocalDate contractStartDateFrom, LocalDate contractStartDateTo,
             LocalDate birthDateFrom, LocalDate birthDateTo, Pageable pageable) {
         
+        log.info("Searching people with filters");
         return personRepository.findAll((root, cq, cb) -> {
             List<Predicate> filters = new ArrayList<>();
             
@@ -217,6 +225,7 @@ public class PersonService {
     }
 
     public Person updatePerson(Long id, UpdatePersonRequest request) {
+        log.info("Updating person {}", id);
         Person person = personRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Person not found with ID: " + id));
 
@@ -309,11 +318,13 @@ public class PersonService {
         }
 
         Person savedPerson = personRepository.save(person);
+        log.info("Person saved {}", savedPerson.getId());
 
         if (!changes.isEmpty()) {
+            log.info("Sending person update events {} changes", changes.size());
             sendPersonUpdateEvents(changes, savedPerson);
         } else {
-            
+            log.debug("No changes detected for person {}", savedPerson.getId());
         }
 
         boolean deptChanged = (oldDepartmentId == null ? person.getDepartment() != null : (person.getDepartment() == null || !oldDepartmentId.equals(person.getDepartment().getId())));
@@ -331,6 +342,7 @@ public class PersonService {
             if (roles.isEmpty()) roles.add("EMPLOYEE");
             boolean updated = authService.updateUser(oldEmail, savedPerson.getEmail(), roles);
             if (!updated) {
+                log.info("User not found in auth, provisioning {}", savedPerson.getEmail());
                 authService.provision(savedPerson.getEmail(), roles);
             }
         } else if ((oldDepartmentId == null || oldTitleId == null) && (targetDepartment != null && targetTitle != null)) {
@@ -341,8 +353,10 @@ public class PersonService {
             if (isHr) roles.add("HR");
             if (isHeadTitle) roles.add("HEAD");
             if (roles.isEmpty()) roles.add("EMPLOYEE");
+            log.info("Provisioning new user {} with roles {}", savedPerson.getEmail(), roles);
             authService.provision(savedPerson.getEmail(), roles);
         } else if (!oldEmail.equalsIgnoreCase(savedPerson.getEmail())) {
+            log.info("Updating auth email from {} to {}", oldEmail, savedPerson.getEmail());
             authService.updateUser(oldEmail, savedPerson.getEmail(), null);
         }
         
@@ -353,6 +367,7 @@ public class PersonService {
             if (isHr) roles.add("HR");
             if (isHead) roles.add("HEAD");
             if (roles.isEmpty()) roles.add("EMPLOYEE");
+            log.info("Ensuring user provisioned {} with roles {}", savedPerson.getEmail(), roles);
             authService.provision(savedPerson.getEmail(), roles);
         }
 
@@ -368,6 +383,7 @@ public class PersonService {
                         targetDepartment.getHeadOfDepartment().getId().equals(savedPerson.getId())) {
                     targetDepartment.setHeadOfDepartment(null);
                     departmentRepository.save(targetDepartment);
+                    log.info("Removed head of department {} due to title change", targetDepartment.getId());
                 }
             }
         }
@@ -524,6 +540,7 @@ public class PersonService {
     }
 
     private void sendPersonUpdateEvents(Map<String, Object> changes, Person person) {
+        log.debug("Preparing person update event for {}", person.getId());
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         String actorEmail = null;
         String actorName = null;
@@ -613,10 +630,12 @@ public class PersonService {
 
         rabbitTemplate.convertAndSend(RabbitMQConfig.PERSON_UPDATE_EXCHANGE, 
                                       RabbitMQConfig.PERSON_UPDATE_ROUTING_KEY, event);
+        log.info("Person update event sent {}", person.getId());
         
     }
 
     public void deletePerson(Long id) {
+        log.info("Deleting person {}", id);
         Person person = personRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Person not found with ID: " + id));
 
@@ -657,6 +676,7 @@ public class PersonService {
         }
 
         personRepository.deleteById(id);
+        log.info("Person deleted {}", id);
     }
 
 

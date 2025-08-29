@@ -3,6 +3,8 @@ package com.example.authservice.service;
 import com.example.authservice.model.UserRole;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import java.security.Key;
@@ -10,6 +12,8 @@ import java.util.Date;
 
 @Service
 public class JwtService {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
     private final Key key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
     
@@ -20,6 +24,7 @@ public class JwtService {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
+        log.debug("Generating token for {} with role {}", email, role.name());
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role.name())
@@ -63,8 +68,10 @@ public class JwtService {
                 .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token);
+            log.debug("JWT parsed successfully");
             return true;
         } catch (JwtException | IllegalArgumentException e) {
+            log.warn("JWT validation failed: {}", e.getMessage());
             return false;
         }
     }
